@@ -1,0 +1,16 @@
+{
+  "name": "@ai-hotel-assistant/types",
+  "version": "0.1.0",
+  "private": true,
+  "types": "dist/index.d.ts",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "scripts": {
+    "build": "tsup src/index.ts --dts --format esm,cjs",
+    "lint": "eslint src --ext .ts",
+    "test": "echo \"No tests yet\""
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
