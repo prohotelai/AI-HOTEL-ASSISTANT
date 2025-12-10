@@ -1,0 +1,157 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Multi-tenant: Each hotel is a tenant
+model Hotel {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  logo        String?
+  website     String?
+  
+  // Contact information
+  email       String?
+  phone       String?
+  address     String?
+  
+  // Widget configuration
+  widgetColor String?  @default("#3B82F6")
+  widgetTitle String?  @default("Chat with us")
+  
+  // API keys for this tenant
+  openaiKey   String?  // Encrypted in production
+  pineconeKey String?  // Encrypted in production
+  stripeKey   String?  // Encrypted in production
+  
+  // Multi-tenancy relationships
+  users         User[]
+  conversations Conversation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([slug])
+}
+
+// NextAuth User model
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?   // Hashed
+  image         String?
+  role          String    @default("user") // user, admin, super_admin
+  
+  // Multi-tenant: user belongs to hotel
+  hotelId       String?
+  hotel         Hotel?    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  accounts      Account[]
+  sessions      Session[]
+  conversations Conversation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([email])
+  @@index([hotelId])
+}
+
+// NextAuth Account model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// NextAuth Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+// NextAuth VerificationToken model
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Conversation: Chat session
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String?   @default("New conversation")
+  
+  // Multi-tenant: conversation belongs to hotel
+  hotelId   String
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  // Optional: if user is authenticated
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // For anonymous widget users
+  guestId   String?   // Anonymous session ID
+  guestName String?
+  guestEmail String?
+  
+  messages  Message[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  @@index([hotelId])
+  @@index([userId])
+  @@index([guestId])
+}
+
+// Message: Individual chat message
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  role           String   // "user" or "assistant"
+  content        String   @db.Text
+  
+  // AI metadata
+  tokens         Int?     // Token count
+  model          String?  // AI model used
+  
+  createdAt      DateTime @default(now())
+  
+  @@index([conversationId])
+  @@index([createdAt])
+}
