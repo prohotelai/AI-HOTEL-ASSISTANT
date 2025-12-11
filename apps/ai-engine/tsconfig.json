@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "../..",
+    "module": "ESNext",
+    "target": "ES2020",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "types": ["node", "vitest"],
+    "paths": {
+      "@ai-hotel/ai-lib": ["../../packages/ai-lib/src/index.ts"],
+      "@ai-hotel/ai-lib/*": ["../../packages/ai-lib/src/*"]
+    }
+  },
+  "include": ["src"]
+}

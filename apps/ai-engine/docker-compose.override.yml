@@ -1,0 +1,19 @@
+version: "3.9"
+services:
+  ai-engine:
+    build: .
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_ENV=${PINECONE_ENV}
+      - PINECONE_INDEX=${PINECONE_INDEX}
+      - AI_ENGINE_JWT_SECRET=${AI_ENGINE_JWT_SECRET}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
