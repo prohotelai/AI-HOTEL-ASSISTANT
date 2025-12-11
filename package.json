@@ -1,0 +1,17 @@
+{
+  "name": "ai-hotel-assistant",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "npm --workspace apps/ai-engine run lint",
+    "typecheck": "npm --workspace apps/ai-engine run typecheck",
+    "test": "npm --workspace apps/ai-engine run test"
+  }
+}
