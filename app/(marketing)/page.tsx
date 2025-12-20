@@ -1,5 +1,7 @@
-import MarketingClientShell from './page.client'
+'use client'
+
+import LandingPageClient from '@/components/marketing/LandingPageClient'
 
 export default function MarketingPage() {
-  return <MarketingClientShell />
+  return <LandingPageClient />
 }
