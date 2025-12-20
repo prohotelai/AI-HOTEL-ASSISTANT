@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { withAuth } from '@/lib/middleware/rbac'
 
-// Get conversations for a user
-export async function GET(req: NextRequest) {
+// Get conversations for a user (guests and staff)
+export const GET = withAuth(async (req: NextRequest) => {
   try {
     const session = await getServerSession(authOptions)
+    const user = session?.user as any
     
-    if (!session?.user?.id) {
+    if (!user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -17,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     const conversations = await prisma.conversation.findMany({
       where: {
-        userId: session.user.id,
+        userId: user.id,
       },
       include: {
         messages: {
@@ -36,4 +38,4 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

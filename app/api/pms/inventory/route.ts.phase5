@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { inventoryService } from '@/lib/services/pms/inventoryService'
+import { withPermission } from '@/lib/middleware/rbac'
+import { Permission } from '@/lib/rbac'
+import { z } from 'zod'
+
+const createItemSchema = z.object({
+  itemName: z.string().min(1),
+  category: z.string(),
+  sku: z.string().optional(),
+  unit: z.string(),
+  reorderLevel: z.number().int().min(0),
+  reorderQuantity: z.number().int().min(1),
+  unitCost: z.number().min(0),
+  supplier: z.string().optional(),
+  location: z.string().optional()
+})
+
+const transactionSchema = z.object({
+  inventoryItemId: z.string(),
+  transactionType: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
+  quantity: z.number().int().min(1),
+  reason: z.string(),
+  reference: z.string().optional()
+})
+
+// GET /api/pms/inventory - List inventory items
+export const GET = withPermission(Permission.ADMIN_VIEW)(async (request: NextRequest) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const { searchParams } = new URL(request.url)
+    const category = searchParams.get('category') || undefined
+    const status = searchParams.get('status') || undefined
+    const lowStock = searchParams.get('lowStock') === 'true'
+    const searchQuery = searchParams.get('search') || undefined
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const offset = parseInt(searchParams.get('offset') || '0')
+
+    const { items, total } = await inventoryService.getInventoryItems(
+      user.hotelId,
+      {
+        category,
+        status,
+        lowStock,
+        searchQuery,
+        limit,
+        offset
+      }
+    )
+
+    return NextResponse.json({ items, total })
+  } catch (error: any) {
+    console.error('Error fetching inventory:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch inventory' },
+      { status: 500 }
+    )
+  }
+})
+
+// POST /api/pms/inventory - Create inventory item
+export const POST = withPermission(Permission.ADMIN_MANAGE)(async (request: NextRequest) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const body = await request.json()
+    const data = createItemSchema.parse(body)
+
+    const item = await inventoryService.createInventoryItem({
+      hotelId: user.hotelId,
+      ...data
+    })
+
+    return NextResponse.json(item, { status: 201 })
+  } catch (error: any) {
+    console.error('Error creating inventory item:', error)
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.issues },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create inventory item' },
+      { status: 500 }
+    )
+  }
+})

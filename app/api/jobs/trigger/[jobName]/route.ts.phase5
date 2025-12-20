@@ -1,0 +1,48 @@
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { housekeepingRoundService } from '@/lib/services/pms/housekeepingRoundService'
+import { maintenanceSchedulerService } from '@/lib/services/pms/maintenanceSchedulerService'
+import { noShowCheckerService } from '@/lib/services/pms/noShowCheckerService'
+import { availabilityRecalcService } from '@/lib/services/pms/availabilityRecalcService'
+import { invoiceGeneratorService } from '@/lib/services/pms/invoiceGeneratorService'
+
+/**
+ * POST /api/jobs/trigger/[jobName]
+ * Manually trigger a background job
+ * 
+ * Available jobs:
+ * - daily-housekeeping-round
+ * - maintenance-scheduler
+ * - check-no-shows
+ * - recalc-availability
+ * - generate-invoices
+ */
+export async function POST(
+  request: Request,
+  { params }: { params: { jobName: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.hotelId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check admin/manager permissions
+    if (!['ADMIN', 'MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    return NextResponse.json({ 
+      success: false,
+      error: 'Job execution tracking not yet implemented'
+    }, { status: 501 })
+  } catch (error: any) {
+    console.error('Error triggering job:', error)
+    return NextResponse.json(
+      { error: 'Failed to trigger job', success: false },
+      { status: 500 }
+    )
+  }
+}

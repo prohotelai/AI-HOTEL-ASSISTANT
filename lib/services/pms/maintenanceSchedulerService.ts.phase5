@@ -1,0 +1,180 @@
+/**
+ * Maintenance Scheduler Service - Preventive maintenance scheduling
+ */
+
+import { prisma } from '@/lib/prisma'
+import { addDays, startOfDay, isBefore } from 'date-fns'
+
+export interface MaintenanceScheduleResult {
+  hotelId: string
+  workOrdersCreated: number
+  equipment: Array<{
+    id: string
+    name: string
+    nextMaintenanceDate: Date
+  }>
+}
+
+export const maintenanceSchedulerService = {
+  /**
+   * Execute preventive maintenance scheduler
+   * Creates work orders for equipment due for maintenance
+   */
+  async executeScheduledMaintenance(hotelId: string): Promise<MaintenanceScheduleResult> {
+    const today = startOfDay(new Date())
+    const createdOrders: Array<{
+      id: string
+      name: string
+      nextMaintenanceDate: Date
+    }> = []
+
+    // Find all equipment due for maintenance
+    const equipmentDueMaintenance = await prisma.equipment.findMany({
+      where: {
+        hotelId,
+        nextMaintenanceDate: {
+          lte: addDays(today, 3) // Get items due in next 3 days
+        }
+      }
+    })
+
+    // Create work orders for due maintenance
+    for (const equipment of equipmentDueMaintenance) {
+      const existingOrder = await prisma.workOrder.findFirst({
+        where: {
+          hotelId,
+          equipmentId: equipment.id,
+          status: {
+            in: ['NEW', 'ASSIGNED', 'IN_PROGRESS']
+          }
+        }
+      })
+
+      // Don't create duplicate orders
+      if (existingOrder) {
+        continue
+      }
+
+      const workOrder = await prisma.workOrder.create({
+        data: {
+          hotelId,
+          workOrderNumber: await this.generateWorkOrderNumber(hotelId),
+          title: `Preventive Maintenance - ${equipment.name}`,
+          description: `Scheduled preventive maintenance for equipment: ${equipment.name}`,
+          category: 'PREVENTIVE',
+          priority: 'NORMAL',
+          status: 'NEW',
+          equipmentId: equipment.id,
+          createdBy: 'SYSTEM'
+        }
+      })
+
+      createdOrders.push({
+        id: workOrder.id,
+        name: equipment.name,
+        nextMaintenanceDate: equipment.nextMaintenanceDate
+      })
+
+      // Update equipment next maintenance date
+      // Typically 30-90 days depending on equipment type
+      const maintenanceInterval = this.getMaintenanceInterval(equipment.category)
+      await prisma.equipment.update({
+        where: { id: equipment.id },
+        data: {
+          lastMaintenanceDate: today,
+          nextMaintenanceDate: addDays(today, maintenanceInterval)
+        }
+      })
+    }
+
+    // Log execution
+    await prisma.jobExecution.create({
+      data: {
+        hotelId,
+        jobName: 'maintenance-scheduler',
+        status: 'COMPLETED',
+        metadata: {
+          workOrdersCreated: createdOrders.length,
+          equipment: createdOrders
+        }
+      }
+    })
+
+    return {
+      hotelId,
+      workOrdersCreated: createdOrders.length,
+      equipment: createdOrders
+    }
+  },
+
+  /**
+   * Get maintenance interval based on equipment category
+   */
+  getMaintenanceInterval(category: string): number {
+    const intervals: Record<string, number> = {
+      HVAC: 90,
+      PLUMBING: 60,
+      ELECTRICAL: 90,
+      APPLIANCE: 30,
+      FURNITURE: 180,
+      SECURITY: 30,
+      ELEVATORS: 45,
+      OTHER: 60
+    }
+    return intervals[category] || 60
+  },
+
+  /**
+   * Generate unique work order number
+   */
+  async generateWorkOrderNumber(hotelId: string): Promise<string> {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+
+    const count = await prisma.workOrder.count({
+      where: {
+        hotelId,
+        createdAt: {
+          gte: new Date(year, today.getMonth(), today.getDate()),
+          lt: new Date(year, today.getMonth(), today.getDate() + 1)
+        }
+      }
+    })
+
+    return `WO-${year}${month}${day}-${String(count + 1).padStart(4, '0')}`
+  },
+
+  /**
+   * Get upcoming maintenance schedule
+   */
+  async getUpcomingSchedule(hotelId: string, daysAhead: number = 30) {
+    const today = startOfDay(new Date())
+
+    return prisma.equipment.findMany({
+      where: {
+        hotelId,
+        nextMaintenanceDate: {
+          gte: today,
+          lte: addDays(today, daysAhead)
+        }
+      },
+      orderBy: { nextMaintenanceDate: 'asc' }
+    })
+  },
+
+  /**
+   * Get equipment maintenance history
+   */
+  async getMaintenanceHistory(equipmentId: string, limit: number = 50) {
+    return prisma.workOrder.findMany({
+      where: {
+        equipmentId,
+        status: 'COMPLETED'
+      },
+      orderBy: { completedAt: 'desc' },
+      take: limit
+    })
+  }
+}

@@ -1,0 +1,50 @@
+
+> ai-hotel-assistant@1.0.0 build
+> next build
+
+  ▲ Next.js 14.2.33
+  - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+./app/dashboard/admin/qr/page.tsx
+96:6  Warning: React Hook useEffect has a missing dependency: 'fetchHotelInfo'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+103:6  Warning: React Hook useEffect has a missing dependency: 'loadTokens'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/dashboard/admin/rbac/assignments/page.tsx
+62:6  Warning: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/dashboard/admin/rbac/permissions/page.tsx
+68:6  Warning: React Hook useEffect has a missing dependency: 'fetchRoleAndPermissions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/dashboard/admin/rbac/roles/page.tsx
+78:6  Warning: React Hook useEffect has a missing dependency: 'fetchRoles'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/dashboard/staff/page.tsx
+60:6  Warning: React Hook useEffect has missing dependencies: 'fetchAIModulesStatus' and 'fetchDashboardData'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./lib/ai/workflow-engine.ts
+264:1  Warning: Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+./lib/logging/audit-logger.ts
+479:1  Warning: Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+./lib/realtime/useRealtime.ts
+111:6  Warning: React Hook useEffect has missing dependencies: 'onConnect', 'onDisconnect', and 'onErrorCallback'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+Failed to compile.
+
+./app/dashboard/tickets/[ticketId]/page.tsx:47:7
+Type error: Type '{ status: TicketStatus; userId: string; hotelId: string; id: string; createdAt: Date; updatedAt: Date; title: string; guestId: string | null; description: string; ... 6 more ...; resolution: string | null; }' is missing the following properties from type 'TicketDetailData': guestName, guestEmail, guestRoom, dueAt, and 7 more.
+
+[0m [90m 45 |[39m         email[33m:[39m session[33m.[39muser[33m.[39memail[33m,[39m[0m
+[0m [90m 46 |[39m       }}[0m
+[0m[31m[1m>[22m[39m[90m 47 |[39m       ticket[33m=[39m{ticket}[0m
+[0m [90m    |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 48 |[39m       tags[33m=[39m{tags}[0m
+[0m [90m 49 |[39m       teamMembers[33m=[39m{team}[0m
+[0m [90m 50 |[39m       permissions[33m=[39m{permissionsForRole(session[33m.[39muser[33m.[39mrole)}[0m
+Next.js build worker exited with code: 1 and signal: null

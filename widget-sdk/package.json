@@ -1,0 +1,32 @@
+{
+  "name": "@prohotelai/widget-sdk",
+  "version": "1.0.0",
+  "description": "Embeddable AI widget SDK for ProHotel AI assistant.",
+  "type": "module",
+  "main": "dist/widget-sdk.umd.cjs",
+  "module": "dist/widget-sdk.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/widget-sdk.es.js",
+      "require": "./dist/widget-sdk.umd.cjs",
+      "default": "./dist/widget-sdk.iife.js"
+    }
+  },
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "test": "vitest --run"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.17.5",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.3.3",
+    "vitest": "^1.6.0"
+  }
+}

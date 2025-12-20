@@ -1,0 +1,157 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { format } from 'date-fns'
+import { CalendarDays, Filter, Plus, Search } from 'lucide-react'
+import { authOptions } from '@/lib/auth'
+import { assertPermission, Permission } from '@/lib/rbac'
+import { listBookings } from '@/lib/services/pmsService'
+import { AnalyticsTrendChart } from '@/apps/dashboard/app/(admin)/components/AnalyticsCharts'
+import { DataTable } from '@/apps/dashboard/app/(admin)/components/DataTable'
+import { StatusBadge } from '@/apps/dashboard/app/(admin)/components/StatusBadge'
+import { Button } from '@/components/ui/button'
+
+export default async function BookingsPage({ searchParams }: { searchParams?: Record<string, string | string[]> }) {
+  const session = await getServerSession(authOptions)
+
+  if (!session) {
+    redirect('/login?callbackUrl=/dashboard/admin/bookings')
+  }
+
+  const { hotelId } = assertPermission(session, Permission.ADMIN_VIEW)
+
+  const status = Array.isArray(searchParams?.status)
+    ? searchParams?.status[0]
+    : typeof searchParams?.status === 'string'
+    ? searchParams.status
+    : undefined
+
+  const bookings = await listBookings({
+    hotelId,
+    status: status ? [status.toUpperCase() as any] : undefined,
+  })
+
+  const trendData = bookings.reduce<Record<string, number>>((acc: Record<string, number>, booking: any) => {
+    const key = format(booking.checkInDate, 'MMM')
+    acc[key] = (acc[key] ?? 0) + 1
+    return acc
+  }, {})
+
+  const trendPoints = Object.entries(trendData).map(([label, count]) => ({ label, value: count as number }))
+
+  const columns = [
+    {
+      key: 'guestName',
+      header: 'Guest',
+      sortable: true,
+      render: (value: unknown, booking: (typeof bookings)[number]) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-white">{String(value ?? 'Guest')}</span>
+          <span className="text-xs text-white/50">{String(booking.externalId ?? 'Unlinked')}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      render: (value: unknown) => {
+        const statusValue = String(value ?? 'PENDING').replace(/_/g, ' ')
+        const tone = statusValue.includes('CONFIRMED') || statusValue.includes('CHECKED') ? 'success' : statusValue.includes('CANCELLED') ? 'danger' : 'default'
+        return <StatusBadge label={statusValue} tone={tone as any} />
+      },
+    },
+    {
+      key: 'checkInDate',
+      header: 'Stay',
+      sortable: true,
+      render: (_value: unknown, row: (typeof bookings)[number]) => (
+        <span className="text-sm text-white/70">
+          {format(row.checkInDate, 'MMM d')} → {format(row.checkOutDate, 'MMM d')}
+        </span>
+      ),
+    },
+    {
+      key: 'totalAmount',
+      header: 'Total',
+      align: 'right' as const,
+      sortable: true,
+      render: (_value: unknown, row: (typeof bookings)[number]) => (
+        <span className="font-medium text-white">
+          {row.totalAmount ? `${row.currency ?? 'USD'} ${(row.totalAmount / 100).toFixed(2)}` : 'Pending'}
+        </span>
+      ),
+    },
+    {
+      key: 'id',
+      header: 'Action',
+      align: 'right' as const,
+      render: (value: unknown) => (
+        <Link href={`/dashboard/admin/bookings/${value}`} className="text-xs text-blue-300 hover:text-blue-200">
+          View
+        </Link>
+      ),
+    },
+  ]
+
+  const tableData = bookings
+
+  return (
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-blue-300/80">Bookings</p>
+            <h1 className="text-3xl font-semibold text-white">Stay & Revenue Ops</h1>
+            <p className="text-sm text-white/60">Monitor nightly stays, channel mix, and outstanding arrivals.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="border-white/20 bg-white/10 text-white">
+              <Filter className="mr-2 h-4 w-4" /> Filters
+            </Button>
+            <Button className="bg-blue-500 hover:bg-blue-400">
+              <Plus className="mr-2 h-4 w-4" /> Create booking
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-5">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:col-span-3">
+            <div className="flex items-center justify-between text-xs text-white/60">
+              <span className="uppercase tracking-wide">6 Month Pace</span>
+              <span className="inline-flex items-center gap-2 text-white/50">
+                <CalendarDays className="h-4 w-4" /> Updated live
+              </span>
+            </div>
+            <div className="mt-4 h-48">
+              <AnalyticsTrendChart data={trendPoints} ariaLabel="Bookings trend" />
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:col-span-2">
+            <p className="text-xs uppercase tracking-wide text-white/60">Quick Search</p>
+            <form className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+              <Search className="h-4 w-4 text-white/40" />
+              <input
+                type="search"
+                placeholder="Find guest or booking id"
+                className="flex-1 bg-transparent text-sm text-white outline-none"
+                name="q"
+              />
+            </form>
+            <p className="mt-3 text-xs text-white/50">
+              TODO: hook provider search across PMS integrations and direct bookings.
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between text-sm text-white/60">
+          <span>{tableData.length} reservations</span>
+          <span>TODO: add CSV export with timezone controls.</span>
+        </div>
+        <DataTable columns={columns} data={tableData} />
+      </section>
+    </div>
+  )
+}

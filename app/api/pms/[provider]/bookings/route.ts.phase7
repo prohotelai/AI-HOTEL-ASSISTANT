@@ -1,0 +1,72 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { ingestBookingWebhook } from '@/lib/services/pmsService'
+import { PMSWebhookPayload } from '@/lib/pms/types'
+import { PMSIntegrationError } from '@/lib/pms/errors'
+
+function resolveProviderSecret(provider: string) {
+  const specificKey = `PMS_${provider.toUpperCase()}_TOKEN`
+  return process.env[specificKey as keyof NodeJS.ProcessEnv] ?? process.env.PMS_WEBHOOK_TOKEN
+}
+
+export async function POST(request: NextRequest, context: { params: { provider: string } }) {
+  const provider = context.params.provider
+  const secret = resolveProviderSecret(provider)
+  const token = request.headers.get('x-provider-token')
+
+  if (!secret || !token || token !== secret) {
+    return NextResponse.json({ message: 'Unauthorized PMS webhook' }, { status: 401 })
+  }
+
+  const hotelSlug = request.headers.get('x-hotel-slug')
+  if (!hotelSlug) {
+    return NextResponse.json({ message: 'Missing hotel slug header' }, { status: 400 })
+  }
+
+  try {
+    const hotel = await prisma.hotel.findUnique({
+      where: { slug: hotelSlug },
+      select: { id: true },
+    })
+
+    if (!hotel) {
+      return NextResponse.json({ message: 'Hotel not found' }, { status: 404 })
+    }
+
+    const body = (await request.json()) as PMSWebhookPayload
+    const correlationId = request.headers.get('x-correlation-id') ?? undefined
+
+    const result = await ingestBookingWebhook(hotel.id, provider, {
+      ...body,
+      metadata: {
+        ...(body.metadata ?? {}),
+        correlationId,
+      },
+    })
+
+    return NextResponse.json(
+      {
+        bookingId: result.booking.id,
+        status: 'synced',
+      },
+      { status: 202 }
+    )
+  } catch (error) {
+    const integrationError =
+      error instanceof PMSIntegrationError
+        ? error
+        : new PMSIntegrationError('PMS webhook failed', {
+            statusCode: 500,
+            code: 'WEBHOOK_FAILED',
+            cause: error,
+          })
+
+    return NextResponse.json(
+      {
+        message: integrationError.message,
+        code: integrationError.code,
+      },
+      { status: integrationError.statusCode }
+    )
+  }
+}

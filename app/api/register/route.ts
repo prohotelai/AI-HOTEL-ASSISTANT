@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { seedDefaultRoles } from '@/lib/services/rbac/rbacService'
 
 export async function POST(req: NextRequest) {
   try {
@@ -70,6 +71,13 @@ export async function POST(req: NextRequest) {
 
       return { hotel, user }
     })
+
+    // Seed default RBAC roles for the new hotel
+    const rolesResult = await seedDefaultRoles(result.hotel.id)
+    if (!rolesResult.success) {
+      console.warn('Failed to seed default roles:', rolesResult.error)
+      // Don't fail registration, just log warning
+    }
 
     return NextResponse.json({
       message: 'Registration successful',

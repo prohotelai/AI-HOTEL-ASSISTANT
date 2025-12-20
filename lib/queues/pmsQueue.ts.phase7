@@ -1,0 +1,66 @@
+import { Queue, Worker } from 'bullmq'
+import IORedis from 'ioredis'
+import { syncProviderBookings } from '@/lib/services/pmsService'
+
+const redisUrl = process.env.REDIS_URL
+
+const connection = redisUrl
+  ? new IORedis(redisUrl, { maxRetriesPerRequest: null })
+  : undefined
+
+export const pmsQueue = connection
+  ? new Queue('pms-sync', { connection })
+  : undefined
+
+if (connection && process.env.NEXT_RUNTIME !== 'edge') {
+  // QueueScheduler is deprecated in bullmq v4+, no longer needed
+  
+  if (process.env.RUN_QUEUE_WORKER === 'true') {
+    new Worker(
+      'pms-sync',
+      async (job) => {
+        if (job.name === 'sync-provider-bookings') {
+          const { hotelId, provider, options } = job.data as {
+            hotelId: string
+            provider: string
+            options?: { since?: string; limit?: number }
+          }
+
+          await syncProviderBookings(hotelId, provider, {
+            since: options?.since ? new Date(options.since) : undefined,
+            limit: options?.limit,
+          })
+        }
+      },
+      { connection }
+    )
+  }
+}
+
+export async function scheduleProviderSync(params: {
+  hotelId: string
+  provider: string
+  options?: { since?: Date; limit?: number }
+}) {
+  if (!pmsQueue) {
+    return
+  }
+
+  await pmsQueue.add(
+    'sync-provider-bookings',
+    {
+      hotelId: params.hotelId,
+      provider: params.provider,
+      options: params.options
+        ? {
+            since: params.options.since?.toISOString(),
+            limit: params.options.limit,
+          }
+        : undefined,
+    },
+    {
+      removeOnComplete: true,
+      removeOnFail: true,
+    }
+  )
+}

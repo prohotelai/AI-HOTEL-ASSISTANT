@@ -1,0 +1,106 @@
+import { NextRequest, NextResponse } from 'next/server'
+import {
+  GraphQLList,
+  GraphQLNonNull,
+  GraphQLObjectType,
+  GraphQLSchema,
+  GraphQLString,
+  graphql,
+} from 'graphql'
+// import { listBookings } from '@/lib/services/pmsService'
+// import { BookingStatus } from '@prisma/client'
+
+function resolveGraphQLToken() {
+  return process.env.PMS_GRAPHQL_TOKEN ?? process.env.PMS_WEBHOOK_TOKEN
+}
+
+/*
+const BookingType = new GraphQLObjectType({
+  name: 'Booking',
+  fields: {
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    hotelId: { type: new GraphQLNonNull(GraphQLString) },
+    status: { type: new GraphQLNonNull(GraphQLString) },
+    source: { type: new GraphQLNonNull(GraphQLString) },
+    guestName: { type: new GraphQLNonNull(GraphQLString) },
+    guestEmail: { type: GraphQLString },
+    guestPhone: { type: GraphQLString },
+    roomNumber: { type: GraphQLString },
+    checkIn: { type: new GraphQLNonNull(GraphQLString) },
+    checkOut: { type: new GraphQLNonNull(GraphQLString) },
+    totalAmount: { type: GraphQLString },
+    currency: { type: GraphQLString },
+    notes: { type: GraphQLString },
+    provider: { type: GraphQLString },
+    externalId: { type: GraphQLString },
+    externalUpdatedAt: { type: GraphQLString },
+    lastSyncedAt: { type: GraphQLString },
+    syncStatus: { type: GraphQLString },
+  },
+})
+
+const QueryType = new GraphQLObjectType({
+  name: 'Query',
+  fields: {
+    bookings: {
+      type: new GraphQLList(BookingType),
+      args: {
+        hotelId: { type: new GraphQLNonNull(GraphQLString) },
+        status: { type: new GraphQLList(GraphQLString) },
+        startDate: { type: GraphQLString },
+        endDate: { type: GraphQLString },
+        provider: { type: GraphQLString },
+      },
+      resolve: async (_source, args: Record<string, unknown>) => {
+        const statusList = Array.isArray(args.status)
+          ? (args.status as string[])?.map((value) => value.toUpperCase())
+          : []
+
+        const parsedStatus = statusList
+          .map((value) => {
+            const key = value as keyof typeof BookingStatus
+            return BookingStatus[key]
+          })
+          .filter(Boolean) as BookingStatus[]
+
+        const startDate = typeof args.startDate === 'string' ? new Date(args.startDate) : undefined
+        const endDate = typeof args.endDate === 'string' ? new Date(args.endDate) : undefined
+
+        const results = await listBookings({
+          hotelId: args.hotelId as string,
+          status: parsedStatus,
+          startDate: startDate && !Number.isNaN(startDate.valueOf()) ? startDate : undefined,
+          endDate: endDate && !Number.isNaN(endDate.valueOf()) ? endDate : undefined,
+          provider: typeof args.provider === 'string' ? args.provider : undefined,
+        })
+
+        return results.map((booking) => ({
+          ...booking,
+          checkIn: booking.checkIn.toISOString(),
+          checkOut: booking.checkOut.toISOString(),
+          externalUpdatedAt: booking.externalUpdatedAt?.toISOString() ?? null,
+          lastSyncedAt: booking.lastSyncedAt?.toISOString() ?? null,
+          totalAmount: booking.totalAmount?.toString() ?? null,
+        }))
+      },
+    },
+  },
+})
+
+const schema = new GraphQLSchema({ query: QueryType })
+*/
+
+export async function POST(request: NextRequest) {
+  const token = request.headers.get('x-api-token')
+  const expected = resolveGraphQLToken()
+
+  if (!expected || !token || token !== expected) {
+    return NextResponse.json({ message: 'Unauthorized PMS GraphQL request' }, { status: 401 })
+  }
+
+  // TODO: Implement booking models for GraphQL
+  return NextResponse.json({ 
+    success: false,
+    error: 'PMS GraphQL not yet fully implemented'
+  }, { status: 501 })
+}

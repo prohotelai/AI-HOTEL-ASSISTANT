@@ -1,0 +1,416 @@
+/**
+ * Inventory Service - Parts, supplies, and stock management
+ */
+
+import { prisma } from '@/lib/prisma'
+
+export interface CreateInventoryItemData {
+  hotelId: string
+  itemName: string
+  category: string
+  sku?: string
+  unit: string
+  reorderLevel: number
+  reorderQuantity: number
+  unitCost: number
+  supplier?: string
+  location?: string
+}
+
+export interface InventoryTransactionData {
+  inventoryItemId: string
+  transactionType: 'IN' | 'OUT' | 'ADJUSTMENT'
+  quantity: number
+  reason: string
+  reference?: string
+  performedById?: string
+}
+
+export const inventoryService = {
+  // Create inventory item
+  async createInventoryItem(data: CreateInventoryItemData) {
+    return prisma.inventoryItem.create({
+      data: {
+        ...data,
+        currentStock: 0,
+        status: 'IN_STOCK'
+      }
+    })
+  },
+
+  // Update inventory item
+  async updateInventoryItem(itemId: string, data: Partial<CreateInventoryItemData>) {
+    return prisma.inventoryItem.update({
+      where: { id: itemId },
+      data
+    })
+  },
+
+  // Get inventory items
+  async getInventoryItems(
+    hotelId: string,
+    filters?: {
+      category?: string
+      status?: string
+      lowStock?: boolean
+      searchQuery?: string
+      limit?: number
+      offset?: number
+    }
+  ) {
+    const where: any = { hotelId }
+
+    if (filters?.category) {
+      where.category = filters.category
+    }
+
+    if (filters?.status) {
+      where.status = filters.status
+    }
+
+    if (filters?.lowStock) {
+      where.currentStock = {
+        lte: prisma.inventoryItem.fields.reorderLevel
+      }
+    }
+
+    if (filters?.searchQuery) {
+      where.OR = [
+        { itemName: { contains: filters.searchQuery, mode: 'insensitive' } },
+        { sku: { contains: filters.searchQuery, mode: 'insensitive' } }
+      ]
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where,
+        orderBy: { itemName: 'asc' },
+        take: filters?.limit || 50,
+        skip: filters?.offset || 0
+      }),
+      prisma.inventoryItem.count({ where })
+    ])
+
+    return { items, total }
+  },
+
+  // Get inventory item by ID
+  async getInventoryItemById(itemId: string) {
+    return prisma.inventoryItem.findUnique({
+      where: { id: itemId },
+      include: {
+        transactions: {
+          orderBy: { timestamp: 'desc' },
+          take: 10
+        }
+      }
+    })
+  },
+
+  // Record inventory transaction
+  async recordTransaction(data: InventoryTransactionData) {
+    const { inventoryItemId, transactionType, quantity, reason, reference, performedById } = data
+
+    // Get current item
+    const item = await prisma.inventoryItem.findUnique({
+      where: { id: inventoryItemId }
+    })
+
+    if (!item) {
+      throw new Error('Inventory item not found')
+    }
+
+    // Calculate new stock level
+    let newStock = item.currentStock
+    if (transactionType === 'IN') {
+      newStock += quantity
+    } else if (transactionType === 'OUT') {
+      newStock -= quantity
+      if (newStock < 0) {
+        throw new Error('Insufficient stock')
+      }
+    } else if (transactionType === 'ADJUSTMENT') {
+      newStock = quantity // Absolute value for adjustments
+    }
+
+    // Create transaction record
+    const transaction = await prisma.inventoryTransaction.create({
+      data: {
+        inventoryItemId,
+        hotelId: item.hotelId,
+        transactionType,
+        quantity,
+        balanceAfter: newStock,
+        reason,
+        reference,
+        performedById,
+        timestamp: new Date()
+      }
+    })
+
+    // Update inventory item stock
+    const updatedItem = await prisma.inventoryItem.update({
+      where: { id: inventoryItemId },
+      data: {
+        currentStock: newStock,
+        lastRestockedDate: transactionType === 'IN' ? new Date() : item.lastRestockedDate,
+        status: this.determineStockStatus(newStock, item.reorderLevel)
+      }
+    })
+
+    return { transaction, item: updatedItem }
+  },
+
+  // Stock in (add stock)
+  async stockIn(
+    inventoryItemId: string,
+    quantity: number,
+    reason: string,
+    reference?: string,
+    performedById?: string
+  ) {
+    return this.recordTransaction({
+      inventoryItemId,
+      transactionType: 'IN',
+      quantity,
+      reason,
+      reference,
+      performedById
+    })
+  },
+
+  // Stock out (consume/use stock)
+  async stockOut(
+    inventoryItemId: string,
+    quantity: number,
+    reason: string,
+    reference?: string,
+    performedById?: string
+  ) {
+    return this.recordTransaction({
+      inventoryItemId,
+      transactionType: 'OUT',
+      quantity,
+      reason,
+      reference,
+      performedById
+    })
+  },
+
+  // Adjust stock (inventory count correction)
+  async adjustStock(
+    inventoryItemId: string,
+    newQuantity: number,
+    reason: string,
+    performedById?: string
+  ) {
+    return this.recordTransaction({
+      inventoryItemId,
+      transactionType: 'ADJUSTMENT',
+      quantity: newQuantity,
+      reason,
+      performedById
+    })
+  },
+
+  // Determine stock status based on levels
+  determineStockStatus(currentStock: number, reorderLevel: number): string {
+    if (currentStock === 0) return 'OUT_OF_STOCK'
+    if (currentStock <= reorderLevel) return 'LOW_STOCK'
+    return 'IN_STOCK'
+  },
+
+  // Get low stock items
+  async getLowStockItems(hotelId: string) {
+    return prisma.inventoryItem.findMany({
+      where: {
+        hotelId,
+        OR: [
+          { status: 'LOW_STOCK' },
+          { status: 'OUT_OF_STOCK' }
+        ]
+      },
+      orderBy: [
+        { status: 'desc' }, // OUT_OF_STOCK first
+        { itemName: 'asc' }
+      ]
+    })
+  },
+
+  // Get items needing reorder
+  async getItemsNeedingReorder(hotelId: string) {
+    const items = await prisma.inventoryItem.findMany({
+      where: { hotelId }
+    })
+
+    return items.filter(item => item.currentStock <= item.reorderLevel)
+  },
+
+  // Generate reorder report
+  async generateReorderReport(hotelId: string) {
+    const itemsToReorder = await this.getItemsNeedingReorder(hotelId)
+
+    return itemsToReorder.map(item => ({
+      itemId: item.id,
+      itemName: item.itemName,
+      sku: item.sku,
+      currentStock: item.currentStock,
+      reorderLevel: item.reorderLevel,
+      reorderQuantity: item.reorderQuantity,
+      estimatedCost: item.reorderQuantity * item.unitCost,
+      supplier: item.supplier
+    }))
+  },
+
+  // Get inventory transaction history
+  async getTransactionHistory(
+    hotelId: string,
+    filters?: {
+      inventoryItemId?: string
+      transactionType?: string
+      startDate?: Date
+      endDate?: Date
+      limit?: number
+      offset?: number
+    }
+  ) {
+    const where: any = { hotelId }
+
+    if (filters?.inventoryItemId) {
+      where.inventoryItemId = filters.inventoryItemId
+    }
+
+    if (filters?.transactionType) {
+      where.transactionType = filters.transactionType
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.timestamp = {}
+      if (filters.startDate) where.timestamp.gte = filters.startDate
+      if (filters.endDate) where.timestamp.lte = filters.endDate
+    }
+
+    const [transactions, total] = await Promise.all([
+      prisma.inventoryTransaction.findMany({
+        where,
+        include: {
+          inventoryItem: {
+            select: {
+              itemName: true,
+              sku: true,
+              category: true
+            }
+          },
+          performedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { timestamp: 'desc' },
+        take: filters?.limit || 50,
+        skip: filters?.offset || 0
+      }),
+      prisma.inventoryTransaction.count({ where })
+    ])
+
+    return { transactions, total }
+  },
+
+  // Get inventory statistics
+  async getInventoryStats(hotelId: string) {
+    const items = await prisma.inventoryItem.findMany({
+      where: { hotelId }
+    })
+
+    const totalItems = items.length
+    const totalValue = items.reduce((sum, item) => sum + (item.currentStock * item.unitCost), 0)
+    const inStockItems = items.filter(item => item.status === 'IN_STOCK').length
+    const lowStockItems = items.filter(item => item.status === 'LOW_STOCK').length
+    const outOfStockItems = items.filter(item => item.status === 'OUT_OF_STOCK').length
+
+    // Get categories breakdown
+    const categoriesMap = new Map<string, number>()
+    items.forEach(item => {
+      const count = categoriesMap.get(item.category) || 0
+      categoriesMap.set(item.category, count + 1)
+    })
+
+    const categories = Array.from(categoriesMap.entries()).map(([name, count]) => ({
+      name,
+      count
+    }))
+
+    return {
+      totalItems,
+      totalValue: Number(totalValue.toFixed(2)),
+      inStockItems,
+      lowStockItems,
+      outOfStockItems,
+      categories,
+      stockDistribution: {
+        inStock: Number(((inStockItems / totalItems) * 100).toFixed(2)),
+        lowStock: Number(((lowStockItems / totalItems) * 100).toFixed(2)),
+        outOfStock: Number(((outOfStockItems / totalItems) * 100).toFixed(2))
+      }
+    }
+  },
+
+  // Get inventory value report
+  async getInventoryValueReport(hotelId: string, groupBy: 'category' | 'supplier' = 'category') {
+    const items = await prisma.inventoryItem.findMany({
+      where: { hotelId }
+    })
+
+    const groupMap = new Map<string, { count: number; value: number }>()
+
+    items.forEach(item => {
+      const key = groupBy === 'category' ? item.category : (item.supplier || 'Unknown')
+      const existing = groupMap.get(key) || { count: 0, value: 0 }
+      
+      groupMap.set(key, {
+        count: existing.count + 1,
+        value: existing.value + (item.currentStock * item.unitCost)
+      })
+    })
+
+    return Array.from(groupMap.entries()).map(([name, data]) => ({
+      name,
+      itemCount: data.count,
+      totalValue: Number(data.value.toFixed(2))
+    })).sort((a, b) => b.totalValue - a.totalValue)
+  },
+
+  // Bulk stock out (for work orders)
+  async bulkStockOut(
+    items: Array<{ inventoryItemId: string; quantity: number }>,
+    reason: string,
+    reference?: string,
+    performedById?: string
+  ) {
+    const results = []
+    
+    for (const item of items) {
+      try {
+        const result = await this.stockOut(
+          item.inventoryItemId,
+          item.quantity,
+          reason,
+          reference,
+          performedById
+        )
+        results.push({ success: true, ...result })
+      } catch (error: any) {
+        results.push({ 
+          success: false, 
+          inventoryItemId: item.inventoryItemId, 
+          error: error.message 
+        })
+      }
+    }
+
+    return results
+  }
+}

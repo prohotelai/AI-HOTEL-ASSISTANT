@@ -1,0 +1,470 @@
+/**
+ * Room Service - Manage rooms and availability
+ */
+
+import { prisma } from '@/lib/prisma'
+import { RoomStatus } from '@prisma/client'
+import { eventBus } from '@/lib/events/eventBus'
+
+export interface CreateRoomInput {
+  hotelId: string
+  roomTypeId: string
+  roomNumber: string
+  floor: number
+  building?: string
+  isAccessible?: boolean
+  isSmoking?: boolean
+  hasBalcony?: boolean
+  hasKitchen?: boolean
+  view?: string
+}
+
+export interface UpdateRoomInput {
+  roomNumber?: string
+  floor?: number
+  building?: string
+  status?: RoomStatus
+  isAccessible?: boolean
+  isSmoking?: boolean
+  hasBalcony?: boolean
+  hasKitchen?: boolean
+  view?: string
+  isOutOfService?: boolean
+  outOfServiceReason?: string
+  outOfServiceUntil?: Date
+}
+
+export interface ListRoomsFilter {
+  hotelId: string
+  roomTypeId?: string
+  floor?: number
+  building?: string
+  status?: RoomStatus
+  isOutOfService?: boolean
+  available?: boolean // Check if available for booking
+}
+
+/**
+ * Create a new room
+ */
+export async function createRoom(input: CreateRoomInput) {
+  const room = await prisma.room.create({
+    data: {
+      hotelId: input.hotelId,
+      roomTypeId: input.roomTypeId,
+      roomNumber: input.roomNumber,
+      floor: input.floor,
+      building: input.building,
+      isAccessible: input.isAccessible ?? false,
+      isSmoking: input.isSmoking ?? false,
+      hasBalcony: input.hasBalcony ?? false,
+      hasKitchen: input.hasKitchen ?? false,
+      view: input.view,
+      status: RoomStatus.AVAILABLE
+    },
+    include: {
+      roomType: true
+    }
+  })
+
+  // Emit event
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('room.created', {
+  //    roomId: room.id,
+  //    hotelId: room.hotelId,
+  //    roomNumber: room.roomNumber
+  //  })
+
+  return room
+}
+
+/**
+ * Get room by ID
+ */
+export async function getRoom(roomId: string, hotelId: string) {
+  return prisma.room.findUnique({
+    where: { id: roomId, hotelId },
+    include: {
+      roomType: true,
+      bookings: {
+        where: {
+          status: { in: ['CHECKED_IN', 'CONFIRMED'] }
+        },
+        take: 1,
+        orderBy: { checkInDate: 'desc' },
+        include: {
+          guest: true
+        }
+      },
+      housekeepingTasks: {
+        where: {
+          status: { not: 'INSPECTED' }
+        },
+        orderBy: { taskDate: 'desc' },
+        take: 5
+      },
+      workOrders: {
+        where: {
+          status: { notIn: ['COMPLETED', 'VERIFIED', 'CANCELLED'] }
+        },
+        orderBy: { reportedAt: 'desc' },
+        take: 5
+      }
+    }
+  })
+}
+
+/**
+ * List rooms with filters
+ */
+export async function listRooms(filter: ListRoomsFilter) {
+  const where: any = {
+    hotelId: filter.hotelId
+  }
+
+  if (filter.roomTypeId) where.roomTypeId = filter.roomTypeId
+  if (filter.floor !== undefined) where.floor = filter.floor
+  if (filter.building) where.building = filter.building
+  if (filter.status) where.status = filter.status
+  if (filter.isOutOfService !== undefined) where.isOutOfService = filter.isOutOfService
+
+  const rooms = await prisma.room.findMany({
+    where,
+    include: {
+      roomType: true,
+      bookings: {
+        where: {
+          status: 'CHECKED_IN'
+        },
+        take: 1,
+        include: {
+          guest: {
+            select: {
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: [
+      { floor: 'asc' },
+      { roomNumber: 'asc' }
+    ]
+  })
+
+  return rooms
+}
+
+/**
+ * Update room
+ */
+export async function updateRoom(roomId: string, hotelId: string, input: UpdateRoomInput, userId: string) {
+  const currentRoom = await prisma.room.findUnique({
+    where: { id: roomId, hotelId }
+  })
+
+  if (!currentRoom) {
+    throw new Error('Room not found')
+  }
+
+  const room = await prisma.room.update({
+    where: { id: roomId, hotelId },
+    data: input,
+    include: {
+      roomType: true
+    }
+  })
+
+  // If status changed, log it
+  if (input.status && input.status !== currentRoom.status) {
+    await logRoomStatusChange(
+      roomId,
+      hotelId,
+      currentRoom.status,
+      input.status,
+      userId,
+      'Manual status change'
+    )
+  }
+
+  // Emit event
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('room.updated', {
+  //    roomId: room.id,
+  //    hotelId: room.hotelId,
+  //    changes: input
+  //  })
+
+  return room
+}
+
+/**
+ * Update room status
+ */
+export async function updateRoomStatus(
+  roomId: string,
+  hotelId: string,
+  newStatus: RoomStatus,
+  userId: string,
+  reason?: string
+) {
+  const currentRoom = await prisma.room.findUnique({
+    where: { id: roomId, hotelId }
+  })
+
+  if (!currentRoom) {
+    throw new Error('Room not found')
+  }
+
+  const room = await prisma.room.update({
+    where: { id: roomId, hotelId },
+    data: { status: newStatus }
+  })
+
+  // Log status change
+  await logRoomStatusChange(
+    roomId,
+    hotelId,
+    currentRoom.status,
+    newStatus,
+    userId,
+    reason
+  )
+
+  // Emit event
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('room.statusChanged', {
+  //    roomId: room.id,
+  //    hotelId: room.hotelId,
+  //    oldStatus: currentRoom.status,
+  //    newStatus: newStatus
+  //  })
+
+  return room
+}
+
+/**
+ * Log room status change
+ */
+export async function logRoomStatusChange(
+  roomId: string,
+  hotelId: string,
+  fromStatus: RoomStatus,
+  toStatus: RoomStatus,
+  changedBy: string,
+  reason?: string
+) {
+  return prisma.roomStatusHistory.create({
+    data: {
+      hotelId,
+      roomId,
+      fromStatus,
+      toStatus,
+      changedBy,
+      reason
+    }
+  })
+}
+
+/**
+ * Get room status history
+ */
+export async function getRoomStatusHistory(roomId: string, hotelId: string, limit = 50) {
+  return prisma.roomStatusHistory.findMany({
+    where: { roomId, hotelId },
+    orderBy: { timestamp: 'desc' },
+    take: limit
+  })
+}
+
+/**
+ * Block/unblock room
+ */
+export async function blockRoom(
+  roomId: string,
+  hotelId: string,
+  reason: string,
+  until?: Date,
+  userId?: string
+) {
+  const room = await prisma.room.update({
+    where: { id: roomId, hotelId },
+    data: {
+      isOutOfService: true,
+      outOfServiceReason: reason,
+      outOfServiceUntil: until,
+      status: RoomStatus.OUT_OF_SERVICE
+    }
+  })
+
+  if (userId) {
+    await logRoomStatusChange(
+      roomId,
+      hotelId,
+      RoomStatus.AVAILABLE,
+      RoomStatus.OUT_OF_SERVICE,
+      userId,
+      reason
+    )
+  }
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('room.blocked', {
+  //    roomId: room.id,
+  //    hotelId: room.hotelId,
+    reason
+  //  })
+
+  return room
+}
+
+export async function unblockRoom(roomId: string, hotelId: string, userId: string) {
+  const room = await prisma.room.update({
+    where: { id: roomId, hotelId },
+    data: {
+      isOutOfService: false,
+      outOfServiceReason: null,
+      outOfServiceUntil: null,
+      status: RoomStatus.AVAILABLE
+    }
+  })
+
+  await logRoomStatusChange(
+    roomId,
+    hotelId,
+    RoomStatus.OUT_OF_SERVICE,
+    RoomStatus.AVAILABLE,
+    userId,
+    'Room unblocked'
+  )
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('room.unblocked', {
+  //    roomId: room.id,
+  //    hotelId: room.hotelId
+  //  })
+
+  return room
+}
+
+/**
+ * Get available rooms for date range
+ */
+export async function getAvailableRooms(
+  hotelId: string,
+  checkIn: Date,
+  checkOut: Date,
+  roomTypeId?: string
+) {
+  // Get all rooms
+  const where: any = {
+    hotelId,
+    isOutOfService: false,
+    status: { in: [RoomStatus.AVAILABLE, RoomStatus.DIRTY, RoomStatus.CLEANING, RoomStatus.INSPECTED] }
+  }
+
+  if (roomTypeId) where.roomTypeId = roomTypeId
+
+  const allRooms = await prisma.room.findMany({
+    where,
+    include: {
+      roomType: true,
+      bookings: {
+        where: {
+          status: { notIn: ['CANCELLED', 'NO_SHOW', 'CHECKED_OUT'] },
+          OR: [
+            {
+              // Overlapping check-in
+              checkInDate: { lte: checkOut },
+              checkOutDate: { gte: checkIn }
+            }
+          ]
+        }
+      }
+    }
+  })
+
+  // Filter out rooms with conflicting bookings
+  const availableRooms = allRooms.filter(room => room.bookings.length === 0)
+
+  return availableRooms
+}
+
+/**
+ * Get room occupancy statistics
+ */
+export async function getRoomOccupancyStats(hotelId: string, startDate: Date, endDate: Date) {
+  const totalRooms = await prisma.room.count({
+    where: { hotelId, isOutOfService: false }
+  })
+
+  const occupiedRooms = await prisma.room.count({
+    where: {
+      hotelId,
+      status: RoomStatus.OCCUPIED
+    }
+  })
+
+  const dirtyRooms = await prisma.room.count({
+    where: {
+      hotelId,
+      status: RoomStatus.DIRTY
+    }
+  })
+
+  const outOfServiceRooms = await prisma.room.count({
+    where: {
+      hotelId,
+      isOutOfService: true
+    }
+  })
+
+  const bookingsInPeriod = await prisma.booking.count({
+    where: {
+      hotelId,
+      status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+      checkInDate: { gte: startDate },
+      checkOutDate: { lte: endDate }
+    }
+  })
+
+  const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0
+
+  return {
+    totalRooms,
+    occupiedRooms,
+    dirtyRooms,
+    outOfServiceRooms,
+    availableRooms: totalRooms - occupiedRooms - outOfServiceRooms,
+    occupancyRate: Math.round(occupancyRate * 100) / 100,
+    bookingsInPeriod
+  }
+}
+
+/**
+ * Delete room (soft delete - mark as inactive)
+ */
+export async function deleteRoom(roomId: string, hotelId: string) {
+  // Check if room has active bookings
+  const activeBookings = await prisma.booking.count({
+    where: {
+      roomId,
+      status: { in: ['CONFIRMED', 'CHECKED_IN'] }
+    }
+  })
+
+  if (activeBookings > 0) {
+    throw new Error('Cannot delete room with active bookings')
+  }
+
+  // Mark as out of service instead of deleting
+  return prisma.room.update({
+    where: { id: roomId, hotelId },
+    data: {
+      isOutOfService: true,
+      outOfServiceReason: 'Room deactivated',
+      status: RoomStatus.OUT_OF_SERVICE
+    }
+  })
+}

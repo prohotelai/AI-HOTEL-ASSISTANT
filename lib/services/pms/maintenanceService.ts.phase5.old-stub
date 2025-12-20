@@ -1,0 +1,419 @@
+/**
+ * Maintenance Service - Work order and equipment management
+ */
+
+import { prisma } from '@/lib/prisma'
+import { eventBus } from '@/lib/events/eventBus'
+
+export interface CreateWorkOrderData {
+  hotelId: string
+  title: string
+  description: string
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'EMERGENCY'
+  category: string
+  roomId?: string
+  equipmentId?: string
+  assignedToId?: string
+  dueDate?: Date
+  estimatedCost?: number
+}
+
+export interface UpdateWorkOrderData {
+  status?: 'NEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED' | 'CANCELLED'
+  assignedToId?: string
+  notes?: string
+  actualCost?: number
+  completedAt?: Date
+}
+
+export const maintenanceService = {
+  // Create work order
+  async createWorkOrder(data: CreateWorkOrderData) {
+    const workOrder = await prisma.workOrder.create({
+      data: {
+        ...data,
+        workOrderNumber: await this.generateWorkOrderNumber(data.hotelId),
+        status: 'PENDING',
+        createdAt: new Date()
+      },
+      include: {
+        room: true,
+        equipment: true,
+        assignedTo: true
+      }
+    })
+
+    // Emit event
+    // TODO: Add PMS event types in Phase 6
+    // eventBus.emit('workorder.created', {
+    //   workOrderId: workOrder.id,
+    //   hotelId: workOrder.hotelId,
+    //   priority: workOrder.priority,
+    //   category: workOrder.category,
+    //   roomId: workOrder.roomId,
+    //   equipmentId: workOrder.equipmentId
+
+    return workOrder
+  },
+
+  // Generate unique work order number
+  async generateWorkOrderNumber(hotelId: string): Promise<string> {
+    const year = new Date().getFullYear()
+    const month = String(new Date().getMonth() + 1).padStart(2, '0')
+    
+    // Phase 4: WorkOrder model will be added
+    // const lastWorkOrder = await prisma.workOrder.findFirst({
+    //   where: { hotelId },
+    //   orderBy: { workOrderNumber: 'desc' }
+    // })
+    const lastWorkOrder = null
+
+    let sequence = 1
+    if (lastWorkOrder) {
+      const lastSequence = parseInt((lastWorkOrder as any).workOrderNumber.split('-').pop() || '0')
+      sequence = lastSequence + 1
+    }
+
+    return `WO-${year}${month}-${String(sequence).padStart(5, '0')}`
+  },
+
+  // Update work order
+  async updateWorkOrder(workOrderId: string, data: UpdateWorkOrderData) {
+    const workOrder = await prisma.workOrder.update({
+      where: { id: workOrderId },
+      data,
+      include: {
+        room: true,
+        equipment: true,
+        assignedTo: true
+      }
+    })
+
+    // Emit status change event
+    if (data.status) {
+      // TODO: Add PMS event types in Phase 6
+      // eventBus.emit('workorder.status_changed', {
+      //   workOrderId: workOrder.id,
+      //   hotelId: workOrder.hotelId,
+      //   oldStatus: workOrder.status,
+      //   newStatus: data.status,
+      //   assignedToId: workOrder.assignedToId
+    }
+
+    // If completed, check if it's part of preventive maintenance schedule
+    if (data.status === 'COMPLETED' && workOrder.maintenanceScheduleId) {
+      await this.recordMaintenanceCompletion(workOrder.maintenanceScheduleId)
+    }
+
+    return workOrder
+  },
+
+  // Assign work order to staff
+  async assignWorkOrder(workOrderId: string, staffId: string) {
+    return this.updateWorkOrder(workOrderId, {
+  //      assignedToId: staffId,
+  //      status: 'ASSIGNED'
+    })
+  },
+
+  // Complete work order
+  async completeWorkOrder(
+    workOrderId: string,
+    actualCost: number,
+    completionNotes?: string
+  ) {
+    return this.updateWorkOrder(workOrderId, {
+      status: 'COMPLETED',
+      actualCost,
+      completedAt: new Date(),
+      notes: completionNotes
+    })
+  },
+
+  // Cancel work order
+  async cancelWorkOrder(workOrderId: string, reason: string) {
+    return this.updateWorkOrder(workOrderId, {
+      status: 'CANCELLED',
+      notes: reason
+    })
+  },
+
+  // Get work orders
+  async getWorkOrders(
+    hotelId: string,
+    filters?: {
+      status?: string
+      priority?: string
+      category?: string
+      roomId?: string
+      equipmentId?: string
+      assignedToId?: string
+      startDate?: Date
+      endDate?: Date
+      limit?: number
+      offset?: number
+    }
+  ) {
+    const where: any = { hotelId }
+
+    if (filters?.status) where.status = filters.status
+    if (filters?.priority) where.priority = filters.priority
+    if (filters?.category) where.category = filters.category
+    if (filters?.roomId) where.roomId = filters.roomId
+    if (filters?.equipmentId) where.equipmentId = filters.equipmentId
+    if (filters?.assignedToId) where.assignedToId = filters.assignedToId
+
+    if (filters?.startDate || filters?.endDate) {
+      where.createdAt = {}
+      if (filters.startDate) where.createdAt.gte = filters.startDate
+      if (filters.endDate) where.createdAt.lte = filters.endDate
+    }
+
+    const [workOrders, total] = await Promise.all([
+      prisma.workOrder.findMany({
+        where,
+        include: {
+          room: true,
+          equipment: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: [
+          { priority: 'desc' },
+          { createdAt: 'desc' }
+        ],
+        take: filters?.limit || 50,
+        skip: filters?.offset || 0
+      }),
+      prisma.workOrder.count({ where })
+    ])
+
+    return { workOrders, total }
+  },
+
+  // Get work order by ID
+  async getWorkOrderById(workOrderId: string) {
+    return prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        room: true,
+        equipment: true,
+        assignedTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        maintenanceSchedule: true
+      }
+    })
+  },
+
+  // Equipment Management
+  async createEquipment(data: {
+    hotelId: string
+    name: string
+    category: string
+    location: string
+    serialNumber?: string
+    purchaseDate?: Date
+    warrantyExpiry?: Date
+    manufacturer?: string
+    model?: string
+    specifications?: any
+  }) {
+    return prisma.equipment.create({
+      data: {
+        ...data,
+        status: 'OPERATIONAL'
+      }
+    })
+  },
+
+  async updateEquipment(equipmentId: string, data: any) {
+    return prisma.equipment.update({
+      where: { id: equipmentId },
+      data
+    })
+  },
+
+  async getEquipment(hotelId: string, filters?: { category?: string; status?: string }) {
+    const where: any = { hotelId }
+    if (filters?.category) where.category = filters.category
+    if (filters?.status) where.status = filters.status
+
+    return prisma.equipment.findMany({
+      where,
+      include: {
+        maintenanceSchedules: {
+          orderBy: { nextDueDate: 'asc' },
+          take: 1
+        },
+        workOrders: {
+          where: {
+            status: {
+              in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS']
+            }
+          }
+        }
+      }
+    })
+  },
+
+  // Preventive Maintenance Scheduling
+  async createMaintenanceSchedule(data: {
+    hotelId: string
+    equipmentId: string
+    taskName: string
+    description?: string
+    frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY'
+    startDate: Date
+    estimatedDuration?: number
+    assignedToId?: string
+  }) {
+    const { frequency, startDate } = data
+    const nextDueDate = this.calculateNextDueDate(startDate, frequency)
+
+    return prisma.maintenanceSchedule.create({
+      data: {
+        ...data,
+        nextDueDate,
+        isActive: true
+      },
+      include: {
+        equipment: true,
+        assignedTo: true
+      }
+    })
+  },
+
+  calculateNextDueDate(startDate: Date, frequency: string): Date {
+    const next = new Date(startDate)
+    
+    switch (frequency) {
+      case 'DAILY':
+        next.setDate(next.getDate() + 1)
+        break
+      case 'WEEKLY':
+        next.setDate(next.getDate() + 7)
+        break
+      case 'MONTHLY':
+        next.setMonth(next.getMonth() + 1)
+        break
+      case 'QUARTERLY':
+        next.setMonth(next.getMonth() + 3)
+        break
+      case 'ANNUALLY':
+        next.setFullYear(next.getFullYear() + 1)
+        break
+    }
+    
+    return next
+  },
+
+  async recordMaintenanceCompletion(scheduleId: string) {
+    const schedule = await prisma.maintenanceSchedule.findUnique({
+      where: { id: scheduleId }
+    })
+
+    if (!schedule) return
+
+    const nextDueDate = this.calculateNextDueDate(new Date(), schedule.frequency)
+
+    return prisma.maintenanceSchedule.update({
+      where: { id: scheduleId },
+      data: {
+        lastCompletedDate: new Date(),
+        nextDueDate
+      }
+    })
+  },
+
+  // Get upcoming preventive maintenance tasks
+  async getUpcomingMaintenanceTasks(hotelId: string, daysAhead: number = 7) {
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + daysAhead)
+
+    return prisma.maintenanceSchedule.findMany({
+      where: {
+        hotelId,
+        isActive: true,
+        nextDueDate: {
+          lte: futureDate
+        }
+      },
+      include: {
+        equipment: true,
+        assignedTo: true
+      },
+      orderBy: {
+        nextDueDate: 'asc'
+      }
+    })
+  },
+
+  // Get maintenance statistics
+  async getMaintenanceStats(hotelId: string, startDate: Date, endDate: Date) {
+    const workOrders = await prisma.workOrder.findMany({
+      where: {
+        hotelId,
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
+      }
+    })
+
+    const totalWorkOrders = workOrders.length
+    const completedWorkOrders = workOrders.filter(wo => wo.status === 'COMPLETED').length
+    const pendingWorkOrders = workOrders.filter(wo => wo.status === 'PENDING').length
+    const inProgressWorkOrders = workOrders.filter(wo => wo.status === 'IN_PROGRESS').length
+    
+    const totalCost = workOrders
+      .filter(wo => wo.actualCost)
+      .reduce((sum, wo) => sum + (wo.actualCost || 0), 0)
+
+    const averageResolutionTime = this.calculateAverageResolutionTime(
+      workOrders.filter(wo => wo.status === 'COMPLETED')
+    )
+
+    return {
+      totalWorkOrders,
+      completedWorkOrders,
+      pendingWorkOrders,
+      inProgressWorkOrders,
+      completionRate: totalWorkOrders > 0 
+        ? Number(((completedWorkOrders / totalWorkOrders) * 100).toFixed(2))
+        : 0,
+      totalCost: Number(totalCost.toFixed(2)),
+      averageResolutionTime: Number(averageResolutionTime.toFixed(1)),
+      byPriority: {
+        emergency: workOrders.filter(wo => wo.priority === 'EMERGENCY').length,
+        urgent: workOrders.filter(wo => wo.priority === 'URGENT').length,
+        high: workOrders.filter(wo => wo.priority === 'HIGH').length,
+        medium: workOrders.filter(wo => wo.priority === 'MEDIUM').length,
+        low: workOrders.filter(wo => wo.priority === 'LOW').length
+      }
+    }
+  },
+
+  calculateAverageResolutionTime(completedWorkOrders: any[]): number {
+    if (completedWorkOrders.length === 0) return 0
+
+    const totalHours = completedWorkOrders.reduce((sum, wo) => {
+      if (wo.completedAt && wo.createdAt) {
+        const hours = (wo.completedAt.getTime() - wo.createdAt.getTime()) / (1000 * 60 * 60)
+        return sum + hours
+      }
+      return sum
+    }, 0)
+
+    return totalHours / completedWorkOrders.length
+  }
+}

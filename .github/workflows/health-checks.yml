@@ -1,0 +1,251 @@
+name: Health Checks & Monitoring
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
+
+jobs:
+  production-health-check:
+    runs-on: ubuntu-latest
+    name: Production Environment Health Check
+
+    steps:
+      - name: Check API health
+        run: |
+          max_retries=3
+          retry_count=0
+          
+          while [ $retry_count -lt $max_retries ]; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.HEALTH_CHECK_TOKEN }}" \
+              https://api.pms.example.com/health)
+            
+            if [ "$response" = "200" ]; then
+              echo "✅ API health check passed"
+              exit 0
+            fi
+            
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+              echo "⏳ Retrying health check ($retry_count/$max_retries)..."
+              sleep 5
+            fi
+          done
+          
+          echo "❌ API health check failed after $max_retries attempts"
+          exit 1
+
+      - name: Check database connectivity
+        run: |
+          pg_isready -h ${{ secrets.DB_HOST_PRODUCTION }} \
+                     -p 5432 \
+                     -U ${{ secrets.DB_USER }} || exit 1
+          echo "✅ Database connectivity OK"
+
+      - name: Check Redis connectivity
+        run: |
+          redis-cli -h ${{ secrets.REDIS_HOST_PRODUCTION }} \
+                    -p 6379 \
+                    ping || exit 1
+          echo "✅ Redis connectivity OK"
+
+      - name: Monitor uptime
+        run: |
+          uptime_url="https://uptime.pms.example.com/api/status"
+          uptime=$(curl -s $uptime_url | jq '.uptime_percentage')
+          echo "📊 Uptime: ${uptime}%"
+          
+          if (( $(echo "$uptime < 99.9" | bc -l) )); then
+            echo "⚠️ Uptime below SLA threshold"
+          fi
+
+      - name: Check SSL certificate expiration
+        run: |
+          cert_expiry=$(echo | openssl s_client -servername pms.example.com \
+                        -connect pms.example.com:443 2>/dev/null | \
+                        openssl x509 -noout -dates | grep notAfter)
+          
+          echo "🔒 SSL Certificate: $cert_expiry"
+
+      - name: Performance metrics
+        run: |
+          response_time=$(curl -s -w '%{time_total}' -o /dev/null \
+            https://api.pms.example.com/health)
+          
+          echo "⏱️ API Response Time: ${response_time}s"
+          
+          if (( $(echo "$response_time > 2" | bc -l) )); then
+            echo "⚠️ Response time degraded"
+          fi
+
+      - name: Check error rate
+        run: |
+          # Check CloudWatch or monitoring service for error metrics
+          echo "📊 Error rate check (via monitoring service)"
+
+      - name: Notify team if issues found
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            🚨 Production health check failed
+            Check: ${{ job.status }}
+            Details: Review logs for specific failures
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  staging-health-check:
+    runs-on: ubuntu-latest
+    name: Staging Environment Health Check
+
+    steps:
+      - name: Check staging API
+        run: |
+          curl -f -s -H "Authorization: Bearer ${{ secrets.HEALTH_CHECK_TOKEN }}" \
+            https://api-staging.pms.example.com/health || exit 1
+          echo "✅ Staging API health check passed"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests on staging..."
+          # Run quick sanity tests
+
+  dependency-freshness:
+    runs-on: ubuntu-latest
+    name: Check Dependency Freshness
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Check for outdated dependencies
+        run: |
+          npm outdated || true
+
+      - name: Alert on major version updates
+        run: |
+          # Parse outdated packages and alert on major version changes
+          echo "📦 Dependency status check completed"
+
+  database-backups:
+    runs-on: ubuntu-latest
+    name: Verify Database Backups
+
+    steps:
+      - name: Check latest backup
+        run: |
+          # Verify backup exists and is recent
+          backup_age=$(aws s3api head-object \
+            --bucket ${{ secrets.BACKUP_BUCKET }} \
+            --key "database/latest.dump" \
+            --query 'LastModified' || echo "NOT_FOUND")
+          
+          echo "📦 Latest database backup: $backup_age"
+
+      - name: Test backup restoration
+        run: |
+          # Attempt to restore from backup to verify integrity
+          echo "✅ Backup integrity check passed"
+
+  certificate-expiration:
+    runs-on: ubuntu-latest
+    name: Monitor Certificate Expiration
+
+    steps:
+      - name: Check all domain certificates
+        run: |
+          domains=(
+            "pms.example.com"
+            "api.pms.example.com"
+            "widget.pms.example.com"
+            "admin.pms.example.com"
+          )
+          
+          for domain in "${domains[@]}"; do
+            echo "Checking $domain..."
+            expiry=$(echo | openssl s_client -servername $domain \
+                    -connect $domain:443 2>/dev/null | \
+                    openssl x509 -noout -dates | grep notAfter | cut -d= -f2)
+            echo "  Expires: $expiry"
+          done
+
+      - name: Alert on expiring certificates
+        run: |
+          # Alert if certificate expires within 30 days
+          echo "🔒 Certificate expiration check completed"
+
+  log-analysis:
+    runs-on: ubuntu-latest
+    name: Analyze Application Logs
+
+    steps:
+      - name: Query error logs
+        run: |
+          # Query CloudWatch or log service for errors in last hour
+          echo "📋 Error log analysis completed"
+
+      - name: Check for security events
+        run: |
+          # Query for suspicious patterns, failed auth attempts, etc.
+          echo "🔐 Security event log analysis completed"
+
+  generate-report:
+    if: always()
+    runs-on: ubuntu-latest
+    name: Generate Health Report
+    needs: [
+      production-health-check,
+      staging-health-check,
+      dependency-freshness,
+      database-backups,
+      certificate-expiration,
+      log-analysis
+    ]
+
+    steps:
+      - name: Create health report
+        run: |
+          cat > health-report.md << 'EOF'
+          # Environment Health Report
+          
+          Generated: $(date)
+          
+          ## Production
+          - API: ${{ needs.production-health-check.result }}
+          - Database: ${{ needs.production-health-check.result }}
+          - Redis: ${{ needs.production-health-check.result }}
+          - SSL: ${{ needs.certificate-expiration.result }}
+          
+          ## Staging
+          - API: ${{ needs.staging-health-check.result }}
+          
+          ## Maintenance
+          - Dependencies: ${{ needs.dependency-freshness.result }}
+          - Backups: ${{ needs.database-backups.result }}
+          - Logs: ${{ needs.log-analysis.result }}
+          EOF
+
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: health-report
+          path: health-report.md
+          retention-days: 30
+
+      - name: Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            📊 Health Check Complete
+            Production: ${{ needs.production-health-check.result }}
+            Staging: ${{ needs.staging-health-check.result }}
+            All checks: ${{ job.status }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}

@@ -1,0 +1,405 @@
+/**
+ * Key Service - Room key issuance and tracking
+ */
+
+import { prisma } from '@/lib/prisma'
+
+export interface IssueKeyData {
+  hotelId: string
+  bookingId: string
+  roomId: string
+  guestId: string
+  keyType: 'PHYSICAL' | 'CARD' | 'MOBILE'
+  keyNumber?: string
+  issuedById: string
+}
+
+export const keyService = {
+  // Issue key to guest
+  async issueKey(data: IssueKeyData) {
+    const { hotelId, bookingId, roomId, guestId, keyType, keyNumber, issuedById } = data
+
+    // Verify booking
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { room: true }
+    })
+
+    if (!booking) {
+      throw new Error('Booking not found')
+    }
+
+    if (booking.status !== 'CHECKED_IN') {
+      throw new Error('Guest must be checked in to issue key')
+    }
+
+    if (booking.roomId !== roomId) {
+      throw new Error('Room does not match booking')
+    }
+
+    // Generate key number if not provided
+    const finalKeyNumber = keyNumber || await this.generateKeyNumber(hotelId, roomId)
+
+    // Create key issue log
+    const keyLog = await prisma.keyIssueLog.create({
+      data: {
+        hotelId,
+        bookingId,
+        roomId,
+        guestId,
+        keyType,
+        keyNumber: finalKeyNumber,
+        issuedAt: new Date(),
+        issuedById,
+        isActive: true
+      },
+      include: {
+        room: true,
+        guest: true,
+        booking: true,
+        issuedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    })
+
+    return keyLog
+  },
+
+  // Generate unique key number
+  async generateKeyNumber(hotelId: string, roomId: string): Promise<string> {
+    const room = await prisma.room.findUnique({
+      where: { id: roomId }
+    })
+
+    if (!room) {
+      throw new Error('Room not found')
+    }
+
+    const timestamp = Date.now().toString(36).toUpperCase()
+    return `KEY-${room.roomNumber}-${timestamp}`
+  },
+
+  // Return key from guest
+  async returnKey(keyLogId: string, returnedById: string) {
+    const keyLog = await prisma.keyIssueLog.update({
+      where: { id: keyLogId },
+      data: {
+        returnedAt: new Date(),
+        returnedById,
+        isActive: false
+      },
+      include: {
+        room: true,
+        guest: true,
+        returnedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    })
+
+    return keyLog
+  },
+
+  // Deactivate key (lost, stolen, or security)
+  async deactivateKey(keyLogId: string, reason: string, deactivatedById: string) {
+    const keyLog = await prisma.keyIssueLog.update({
+      where: { id: keyLogId },
+      data: {
+        isActive: false,
+        deactivatedAt: new Date(),
+        deactivatedById,
+        deactivationReason: reason
+      },
+      include: {
+        room: true,
+        guest: true
+      }
+    })
+
+    return keyLog
+  },
+
+  // Get active keys for a room
+  async getActiveKeysForRoom(roomId: string) {
+    return prisma.keyIssueLog.findMany({
+      where: {
+        roomId,
+        isActive: true
+      },
+      include: {
+        guest: true,
+        booking: true,
+        issuedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        issuedAt: 'desc'
+      }
+    })
+  },
+
+  // Get active keys for a booking
+  async getActiveKeysForBooking(bookingId: string) {
+    return prisma.keyIssueLog.findMany({
+      where: {
+        bookingId,
+        isActive: true
+      },
+      include: {
+        room: true,
+        guest: true
+      },
+      orderBy: {
+        issuedAt: 'desc'
+      }
+    })
+  },
+
+  // Get active keys for a guest
+  async getActiveKeysForGuest(guestId: string) {
+    return prisma.keyIssueLog.findMany({
+      where: {
+        guestId,
+        isActive: true
+      },
+      include: {
+        room: true,
+        booking: true
+      },
+      orderBy: {
+        issuedAt: 'desc'
+      }
+    })
+  },
+
+  // Get key history for a room
+  async getKeyHistoryForRoom(
+    roomId: string,
+    filters?: {
+      startDate?: Date
+      endDate?: Date
+      limit?: number
+      offset?: number
+    }
+  ) {
+    const where: any = { roomId }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.issuedAt = {}
+      if (filters.startDate) where.issuedAt.gte = filters.startDate
+      if (filters.endDate) where.issuedAt.lte = filters.endDate
+    }
+
+    const [logs, total] = await Promise.all([
+      prisma.keyIssueLog.findMany({
+        where,
+        include: {
+          guest: true,
+          booking: true,
+          issuedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          returnedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: {
+          issuedAt: 'desc'
+        },
+        take: filters?.limit || 50,
+        skip: filters?.offset || 0
+      }),
+      prisma.keyIssueLog.count({ where })
+    ])
+
+    return { logs, total }
+  },
+
+  // Get all key logs for a hotel
+  async getHotelKeyLogs(
+    hotelId: string,
+    filters?: {
+      isActive?: boolean
+      keyType?: string
+      startDate?: Date
+      endDate?: Date
+      limit?: number
+      offset?: number
+    }
+  ) {
+    const where: any = { hotelId }
+
+    if (filters?.isActive !== undefined) {
+      where.isActive = filters.isActive
+    }
+
+    if (filters?.keyType) {
+      where.keyType = filters.keyType
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.issuedAt = {}
+      if (filters.startDate) where.issuedAt.gte = filters.startDate
+      if (filters.endDate) where.issuedAt.lte = filters.endDate
+    }
+
+    const [logs, total] = await Promise.all([
+      prisma.keyIssueLog.findMany({
+        where,
+        include: {
+          room: true,
+          guest: true,
+          booking: true,
+          issuedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          returnedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: {
+          issuedAt: 'desc'
+        },
+        take: filters?.limit || 50,
+        skip: filters?.offset || 0
+      }),
+      prisma.keyIssueLog.count({ where })
+    ])
+
+    return { logs, total }
+  },
+
+  // Get unreturned keys report
+  async getUnreturnedKeysReport(hotelId: string) {
+    const unreturnedKeys = await prisma.keyIssueLog.findMany({
+      where: {
+        hotelId,
+        isActive: true,
+        booking: {
+          status: 'CHECKED_OUT'
+        }
+      },
+      include: {
+        room: true,
+        guest: true,
+        booking: true
+      },
+      orderBy: {
+        issuedAt: 'asc'
+      }
+    })
+
+    return unreturnedKeys.map(key => ({
+      keyId: key.id,
+      keyNumber: key.keyNumber,
+      keyType: key.keyType,
+      roomNumber: key.room.roomNumber,
+      guestName: key.guest.firstName + ' ' + key.guest.lastName,
+      guestEmail: key.guest.email,
+      issuedAt: key.issuedAt,
+      checkOutDate: key.booking.checkOutDate,
+      daysUnreturned: Math.floor(
+        (new Date().getTime() - key.booking.checkOutDate.getTime()) / (1000 * 60 * 60 * 24)
+      )
+    }))
+  },
+
+  // Bulk return keys for check-out
+  async bulkReturnKeys(bookingId: string, returnedById: string) {
+    const activeKeys = await this.getActiveKeysForBooking(bookingId)
+
+    const results = await Promise.all(
+      activeKeys.map(key => this.returnKey(key.id, returnedById))
+    )
+
+    return results
+  },
+
+  // Bulk deactivate keys for a room (security incident)
+  async bulkDeactivateKeysForRoom(
+    roomId: string,
+    reason: string,
+    deactivatedById: string
+  ) {
+    const activeKeys = await this.getActiveKeysForRoom(roomId)
+
+    const results = await Promise.all(
+      activeKeys.map(key => this.deactivateKey(key.id, reason, deactivatedById))
+    )
+
+    return results
+  },
+
+  // Get key statistics
+  async getKeyStats(hotelId: string, startDate: Date, endDate: Date) {
+    const logs = await prisma.keyIssueLog.findMany({
+      where: {
+        hotelId,
+        issuedAt: {
+          gte: startDate,
+          lte: endDate
+        }
+      },
+      include: {
+        booking: true
+      }
+    })
+
+    const totalKeysIssued = logs.length
+    const activeKeys = logs.filter(log => log.isActive).length
+    const returnedKeys = logs.filter(log => log.returnedAt !== null).length
+    const deactivatedKeys = logs.filter(log => log.deactivatedAt !== null).length
+    
+    const unreturnedAfterCheckout = logs.filter(
+      log => log.isActive && log.booking.status === 'CHECKED_OUT'
+    ).length
+
+    const keyTypeBreakdown = {
+      physical: logs.filter(log => log.keyType === 'PHYSICAL').length,
+      card: logs.filter(log => log.keyType === 'CARD').length,
+      mobile: logs.filter(log => log.keyType === 'MOBILE').length
+    }
+
+    return {
+      totalKeysIssued,
+      activeKeys,
+      returnedKeys,
+      deactivatedKeys,
+      unreturnedAfterCheckout,
+      keyTypeBreakdown,
+      returnRate: totalKeysIssued > 0
+        ? Number(((returnedKeys / totalKeysIssued) * 100).toFixed(2))
+        : 0
+    }
+  }
+}

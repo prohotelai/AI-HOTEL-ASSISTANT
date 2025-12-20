@@ -1,0 +1,428 @@
+/**
+ * Session Lifecycle Service
+ * Manages session creation, validation, rotation, and invalidation
+ */
+
+import { prisma } from '@/lib/prisma'
+import {
+  generateTokenPair,
+  hashToken,
+  generateFingerprint,
+  generateSessionId,
+  SessionMetadata,
+  verifyFingerprint,
+  verifyIPRange,
+  verifyUserAgent,
+  detectTokenReuse,
+  validateTokenFormat
+} from '@/lib/security/tokenUtils'
+
+export interface CreateSessionOptions {
+  userId: string
+  hotelId: string
+  role: string
+  userAgent: string
+  ipAddress: string
+  deviceId?: string
+}
+
+export interface SessionValidationResult {
+  valid: boolean
+  sessionId?: string
+  userId?: string
+  hotelId?: string
+  role?: string
+  suspiciousFlags?: string[]
+  error?: string
+}
+
+export interface SessionRotationResult {
+  newAccessToken: string
+  newRefreshToken: string
+  newAccessTokenHash: string
+  newRefreshTokenHash: string
+}
+
+/**
+ * Create a new session with access and refresh tokens
+ * @param options - Session creation options
+ * @returns Session record with tokens
+ */
+export async function createSession(options: CreateSessionOptions) {
+  const { userId, hotelId, role, userAgent, ipAddress, deviceId } = options
+  
+  // Generate session ID and tokens
+  const sessionId = generateSessionId()
+  const { accessToken, refreshToken, accessTokenHash, refreshTokenHash } = generateTokenPair()
+  
+  // Generate device fingerprint
+  const metadata: SessionMetadata = {
+    userAgent,
+    ipAddress,
+    deviceId
+  }
+  const deviceFingerprint = generateFingerprint(metadata)
+  const ipRange = ipAddress.split('.').slice(0, 3).join('.')
+  
+  // Create session record
+  const session = await prisma.session.create({
+    data: {
+      id: sessionId,
+      userId,
+      hotelId,
+      role,
+      tokenHash: accessTokenHash,
+      userAgent,
+      ipAddress,
+      ipRange,
+      deviceFingerprint,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      isActive: true,
+      lastActivity: new Date(),
+      tokenReuses: 0,
+      suspiciousFlags: [],
+      refreshTokens: {
+        create: {
+          tokenHash: refreshTokenHash,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        }
+      }
+    },
+    include: {
+      refreshTokens: true
+    }
+  })
+  
+  return {
+    sessionId,
+    accessToken,
+    refreshToken,
+    session
+  }
+}
+
+/**
+ * Validate an existing session using access token
+ * Checks expiry, token hash, activity status
+ * @param accessToken - Access token to validate
+ * @param sessionMetadata - Current request metadata
+ * @returns Validation result with session details or error
+ */
+export async function validateSession(
+  accessToken: string,
+  sessionMetadata: SessionMetadata
+): Promise<SessionValidationResult> {
+  // Validate token format
+  const formatValidation = validateTokenFormat(accessToken)
+  if (!formatValidation.valid) {
+    return {
+      valid: false,
+      error: `Invalid token format: ${formatValidation.reason}`
+    }
+  }
+  
+  // Hash the token to lookup in database
+  const tokenHash = hashToken(accessToken)
+  
+  // Find session by token hash
+  const session = await prisma.session.findUnique({
+    where: { tokenHash }
+  })
+  
+  if (!session) {
+    return {
+      valid: false,
+      error: 'Session not found'
+    }
+  }
+  
+  // Check if session is active
+  if (!session.isActive) {
+    return {
+      valid: false,
+      error: 'Session is inactive'
+    }
+  }
+  
+  // Check if session has expired
+  if (session.expiresAt < new Date()) {
+    // Mark as inactive and return error
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { isActive: false }
+    })
+    return {
+      valid: false,
+      error: 'Session has expired'
+    }
+  }
+  
+  // Verify fingerprint (device/IP/UA match)
+  const suspiciousFlags: string[] = [...(session.suspiciousFlags || [])]
+  const fingerprintVerification = verifyFingerprint(sessionMetadata, session.deviceFingerprint, false)
+  if (!fingerprintVerification.valid) {
+    suspiciousFlags.push(...fingerprintVerification.suspiciousFlags)
+  }
+  
+  // Verify IP range (not exact match, but same subnet)
+  const ipVerification = verifyIPRange(sessionMetadata.ipAddress, session.ipAddress)
+  if (ipVerification.suspicious) {
+    suspiciousFlags.push('IP_RANGE_MISMATCH')
+  }
+  
+  // Verify User-Agent
+  const uaVerification = verifyUserAgent(sessionMetadata.userAgent, session.userAgent)
+  if (uaVerification.suspicious) {
+    suspiciousFlags.push('USER_AGENT_MISMATCH')
+  }
+  
+  // Check token reuse detection
+  const reuseDetection = detectTokenReuse(session.tokenReuses, 0)
+  if (reuseDetection.suspicious) {
+    suspiciousFlags.push('TOKEN_REUSE_DETECTED')
+  }
+  
+  // Update last activity
+  await prisma.session.update({
+    where: { id: session.id },
+    data: {
+      lastActivity: new Date(),
+      suspiciousFlags: suspiciousFlags
+    }
+  })
+  
+  return {
+    valid: true,
+    sessionId: session.id,
+    userId: session.userId,
+    hotelId: session.hotelId,
+    role: session.role,
+    suspiciousFlags: suspiciousFlags.length > 0 ? suspiciousFlags : undefined
+  }
+}
+
+/**
+ * Rotate session tokens (refresh)
+ * Invalidates old refresh token and creates new token pair
+ * @param refreshToken - Refresh token
+ * @param sessionMetadata - Current request metadata
+ * @returns New token pair
+ */
+export async function rotateSession(
+  refreshToken: string,
+  sessionMetadata: SessionMetadata
+): Promise<SessionRotationResult> {
+  // Validate token format
+  const formatValidation = validateTokenFormat(refreshToken)
+  if (!formatValidation.valid) {
+    throw new Error(`Invalid refresh token format: ${formatValidation.reason}`)
+  }
+  
+  // Hash the token to lookup
+  const refreshTokenHash = hashToken(refreshToken)
+  
+  // Find refresh token record
+  const refreshTokenRecord = await prisma.refreshToken.findUnique({
+    where: { tokenHash: refreshTokenHash },
+    include: { session: true }
+  })
+  
+  if (!refreshTokenRecord) {
+    throw new Error('Refresh token not found')
+  }
+  
+  // Check if refresh token has expired
+  if (refreshTokenRecord.expiresAt < new Date()) {
+    throw new Error('Refresh token has expired')
+  }
+  
+  // Check if it's been revoked
+  if (refreshTokenRecord.revokedAt) {
+    throw new Error('Refresh token has been revoked')
+  }
+  
+  // Generate new token pair
+  const { accessToken, refreshToken: newRefreshToken, accessTokenHash, refreshTokenHash: newRefreshTokenHash } = generateTokenPair()
+  
+  // Update refresh token record (mark as rotated, set next token hash)
+  await prisma.refreshToken.update({
+    where: { id: refreshTokenRecord.id },
+    data: {
+      rotatedAt: new Date(),
+      nextTokenHash: newRefreshTokenHash
+    }
+  })
+  
+  // Create new refresh token record
+  const session = refreshTokenRecord.session
+  await prisma.refreshToken.create({
+    data: {
+      sessionId: session.id,
+      tokenHash: newRefreshTokenHash,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    }
+  })
+  
+  // Update session's access token hash and increment reuse counter
+  await prisma.session.update({
+    where: { id: session.id },
+    data: {
+      tokenHash: accessTokenHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // New 10-minute window
+      lastActivity: new Date(),
+      tokenReuses: session.tokenReuses + 1
+    }
+  })
+  
+  return {
+    newAccessToken: accessToken,
+    newRefreshToken: newRefreshToken,
+    newAccessTokenHash: accessTokenHash,
+    newRefreshTokenHash: newRefreshTokenHash
+  }
+}
+
+/**
+ * Invalidate a session (logout)
+ * Marks session as inactive and revokes all refresh tokens
+ * @param sessionId - Session to invalidate
+ * @param reason - Reason for invalidation (for audit logging)
+ */
+export async function invalidateSession(
+  sessionId: string,
+  reason: string = 'User logout'
+) {
+  // Mark session as inactive
+  await prisma.session.update({
+    where: { id: sessionId },
+    data: {
+      isActive: false
+    }
+  })
+  
+  // Revoke all refresh tokens for this session
+  await prisma.refreshToken.updateMany({
+    where: { sessionId },
+    data: {
+      revokedAt: new Date()
+    }
+  })
+  
+  return {
+    sessionId,
+    invalidatedAt: new Date(),
+    reason
+  }
+}
+
+/**
+ * Invalidate all sessions for a user (e.g., password change)
+ * @param userId - User whose sessions to invalidate
+ * @param reason - Reason for invalidation
+ */
+export async function invalidateAllUserSessions(
+  userId: string,
+  reason: string = 'User request'
+) {
+  // Find all active sessions for user
+  const sessions = await prisma.session.findMany({
+    where: {
+      userId,
+      isActive: true
+    }
+  })
+  
+  // Invalidate each session
+  const results = await Promise.all(
+    sessions.map(session => invalidateSession(session.id, reason))
+  )
+  
+  return {
+    invalidatedCount: results.length,
+    sessionIds: results.map(r => r.sessionId),
+    reason
+  }
+}
+
+/**
+ * Clean up expired sessions and refresh tokens
+ * Should be run periodically (e.g., every 10 minutes via cron)
+ * @returns Count of cleaned up records
+ */
+export async function cleanupExpiredSessions() {
+  const now = new Date()
+  
+  // Delete expired refresh tokens
+  const deletedRefreshTokens = await prisma.refreshToken.deleteMany({
+    where: {
+      expiresAt: { lt: now }
+    }
+  })
+  
+  // Mark expired sessions as inactive
+  const updatedSessions = await prisma.session.updateMany({
+    where: {
+      expiresAt: { lt: now },
+      isActive: true
+    },
+    data: {
+      isActive: false
+    }
+  })
+  
+  return {
+    deletedRefreshTokens: deletedRefreshTokens.count,
+    inactivatedSessions: updatedSessions.count,
+    timestamp: now
+  }
+}
+
+/**
+ * Get all active sessions for a user
+ * @param userId - User ID
+ * @param hotelId - Hotel ID (for multi-tenant isolation)
+ * @returns List of active sessions
+ */
+export async function getUserActiveSessions(
+  userId: string,
+  hotelId: string
+) {
+  return prisma.session.findMany({
+    where: {
+      userId,
+      hotelId,
+      isActive: true,
+      expiresAt: { gt: new Date() }
+    },
+    select: {
+      id: true,
+      userAgent: true,
+      ipAddress: true,
+      createdAt: true,
+      lastActivity: true
+    }
+  })
+}
+
+/**
+ * Verify session belongs to user and hotel
+ * @param sessionId - Session ID
+ * @param userId - Expected user ID
+ * @param hotelId - Expected hotel ID
+ * @returns true if session matches, false otherwise
+ */
+export async function verifySessionOwnership(
+  sessionId: string,
+  userId: string,
+  hotelId: string
+): Promise<boolean> {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId }
+  })
+  
+  if (!session) {
+    return false
+  }
+  
+  return session.userId === userId && session.hotelId === hotelId
+}

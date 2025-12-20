@@ -6,10 +6,10 @@ Successfully implemented a complete **multi-tenant SaaS starter** for AI-powered
 
 ## 📊 Implementation Statistics
 
-- **Total Files Created**: 37 TypeScript/TSX files
-- **Components**: 6 reusable React components
-- **API Routes**: 5 RESTful endpoints
-- **Pages**: 6 complete application pages
+- **Total Files Created**: 44 TypeScript/TSX files
+- **Components**: 9 reusable React components
+- **API Routes**: 8 RESTful endpoints
+- **Pages**: 7 complete application pages
 - **Build Status**: ✅ Successful production build
 - **Code Quality**: ✅ Zero ESLint errors
 - **Lines of Code**: ~8,600+ lines
@@ -31,6 +31,48 @@ Successfully implemented a complete **multi-tenant SaaS starter** for AI-powered
 | Database | Prisma + PostgreSQL | Type-safe ORM, Neon compatibility |
 | Auth | NextAuth.js | Industry standard, extensible |
 | Icons | Lucide React | Modern, tree-shakeable |
+| Background Jobs | BullMQ + Redis | SLA reminders, AI automation |
+
+## 🗂️ Module 1 — Tickets System
+
+- **Data Model:** Added `Ticket`, `TicketComment`, `TicketAudit`, `TicketTag`, `TicketTagOnTicket`, and `TicketAutomationRun` models with enums for status, priority, source, and visibility.
+- **Service Layer:** Introduced `lib/services/ticketService.ts` with create, update, list, comment, and close workflows plus audit logging and automation triggers.
+- **Validation:** Implemented dedicated Zod schemas in `lib/validation/tickets.ts` and covered defaults/normalization via Vitest at [tests/validation/tickets.test.ts](tests/validation/tickets.test.ts).
+- **RBAC Enforcement:** Extended RBAC utilities so API routes assert permissions for viewing, creating, updating, assigning, commenting, and closing tickets.
+- **API Endpoints:** Added REST handlers under `app/api/tickets` for listing, CRUD, and comments, wired to service logic with tenant scoping.
+- **Queues & Events:** Wired SLA and AI summary scheduling through `lib/events/eventBus.ts` and `lib/queues/ticketQueues.ts` to support future automations.
+- **Dashboard UI:** Built [components/tickets/TicketsDashboard.tsx](components/tickets/TicketsDashboard.tsx) and [components/tickets/TicketDetail.tsx](components/tickets/TicketDetail.tsx) for list and detail management, including filters, forms, and comment threads.
+- **Routes:** Added [app/dashboard/tickets/page.tsx](app/dashboard/tickets/page.tsx) and [app/dashboard/tickets/[ticketId]/page.tsx](app/dashboard/tickets/%5BticketId%5D/page.tsx) with server-side permission checks and data hydrations.
+- **Quality Gates:** `npm run lint` and `npm test -- --run` (Vitest) verified Module 1 additions.
+
+## 🗂️ Module 2 — Knowledge Base Ingestion
+
+- **Data Model:** Added KnowledgeBaseSource, KnowledgeBaseDocument, KnowledgeBaseChunk, and KnowledgeBaseSyncJob models with enums for types, statuses, and sync orchestration.
+- **Validation:** Introduced knowledge base Zod schemas for sources, documents, filters, and chunk options at [lib/validation/knowledgeBase.ts](lib/validation/knowledgeBase.ts), covered by Vitest in [tests/knowledge-base/validation.test.ts](tests/knowledge-base/validation.test.ts).
+- **Chunking Utility:** Implemented [lib/knowledgeBase/chunker.ts](lib/knowledgeBase/chunker.ts) with overlap-aware chunk generation and tests in [tests/knowledge-base/chunker.test.ts](tests/knowledge-base/chunker.test.ts).
+- **Service Layer:** Created [lib/services/knowledgeBaseService.ts](lib/services/knowledgeBaseService.ts) for source management, document ingestion with checksum dedupe, chunk persistence, and sync job scheduling.
+- **Queues & Events:** Registered knowledge base queue workers and events via [lib/queues/knowledgeBaseQueue.ts](lib/queues/knowledgeBaseQueue.ts) and extended [lib/events/eventBus.ts](lib/events/eventBus.ts) to broadcast ingestion lifecycle updates.
+- **API Endpoints:** Added CRUD and sync routes under `app/api/knowledge-base` for sources, documents, chunks, and jobs with RBAC enforcement.
+- **RBAC:** Expanded permissions in [lib/rbac.ts](lib/rbac.ts) to scope knowledge base management by role.
+- **Testing:** `npm test -- --run` covers ticket and knowledge base validation plus chunking logic.
+
+## 🧠 Module 3 — AI Orchestration
+
+- **Retrieval Engine:** Implemented [lib/ai/retrieval.ts](lib/ai/retrieval.ts) to rank knowledge base chunks with freshness boosts, plus formatting helpers consumed by the chat pipeline.
+- **OpenAI Client:** Added lightweight REST wrapper in [lib/ai/openai.ts](lib/ai/openai.ts) honoring `OPENAI_API_KEY`, `OPENAI_MODEL`, and optional `OPENAI_BASE_URL` for self-hosted proxies.
+- **Tooling Scaffolding:** Created [lib/ai/tools.ts](lib/ai/tools.ts) with initial ticket-creation tool definition and execution stub for future deep integration.
+- **Chat Endpoint:** Replaced placeholder response in [app/api/chat/route.ts](app/api/chat/route.ts) with retrieval-augmented GPT calls, tool execution hooks, graceful fallback messaging, and event emissions.
+- **Events & Metadata:** Extended [lib/events/eventBus.ts](lib/events/eventBus.ts) to broadcast `chat.message.generated` including token usage; assistant messages now persist model identifiers and usage stats.
+- **Testing:** Added retrieval ranking coverage at [tests/ai/retrieval.test.ts](tests/ai/retrieval.test.ts) and re-ran Vitest suite (`npm test -- --run`).
+
+## 💬 Module 6 — AI Widget SDK
+
+- **Standalone Package:** Delivered `widget-sdk/` with dedicated `package.json`, Vite build (`npm run widget:build`), Vitest suite, and IIFE/UMD/ESM bundle outputs.
+- **Public API:** `createWidget` returns lifecycle controls (`open`, `close`, `sendMessage`, `setLanguage`, `setTheme`, `startVoice`, `stopVoice`, `destroy`) plus `on()` for telemetry events (`ready`, `message:sent`, `message:received`, `voice:start`, `voice:stop`, `error`).
+- **Chat + Voice UX:** Vanilla TS DOM renderer (`widgetDom.ts`) provides floating toggle, message history, quick “Create ticket” CTA (gated by permissions), and audio playback via SpeechSynthesis.
+- **Localization & Theming:** `i18n.ts` ships EN/ES/FR defaults with override support; `theme.ts` exposes design tokens for accent/background/text, border radius, and font family.
+- **Event & RBAC Support:** Lightweight event bus (`events.ts`) dispatches custom browser events while respecting permission scopes passed from host integrations.
+- **Integration Docs:** Added [docs/module-06-widget-sdk.md](docs/module-06-widget-sdk.md) and updated README with script commands and `<script>`/ESM examples.
 
 ## 📁 Project Structure
 

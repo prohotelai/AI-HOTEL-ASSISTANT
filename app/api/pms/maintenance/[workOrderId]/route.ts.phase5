@@ -1,0 +1,74 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { maintenanceService } from '@/lib/services/pms/maintenanceService'
+import { withPermission } from '@/lib/middleware/rbac'
+import { Permission } from '@/lib/rbac'
+import { z } from 'zod'
+
+const updateWorkOrderSchema = z.object({
+  status: z.enum(['NEW', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED', 'CANCELLED']).optional(),
+  assignedToId: z.string().optional(),
+  notes: z.string().optional(),
+  actualCost: z.number().min(0).optional()
+})
+
+// GET /api/pms/maintenance/[workOrderId] - Get work order details
+export const GET = withPermission(Permission.ADMIN_VIEW)(async (
+  request: NextRequest,
+  { params }: { params: { workOrderId: string } }
+) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const workOrder = await maintenanceService.getWorkOrderById(params.workOrderId)
+
+    if (!workOrder || workOrder.hotelId !== user.hotelId) {
+      return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(workOrder)
+  } catch (error: any) {
+    console.error('Error fetching work order:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch work order' },
+      { status: 500 }
+    )
+  }
+})
+
+// PATCH /api/pms/maintenance/[workOrderId] - Update work order
+export const PATCH = withPermission(Permission.ADMIN_MANAGE)(async (
+  request: NextRequest,
+  { params }: { params: { workOrderId: string } }
+) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const body = await request.json()
+    const data = updateWorkOrderSchema.parse(body)
+
+    const workOrder = await maintenanceService.updateWorkOrder(
+      params.workOrderId,
+      data
+    )
+
+    return NextResponse.json(workOrder)
+  } catch (error: any) {
+    console.error('Error updating work order:', error)
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.issues },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update work order' },
+      { status: 500 }
+    )
+  }
+})

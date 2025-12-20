@@ -1,0 +1,101 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { noShowCheckerService } from '@/lib/services/pms/noShowCheckerService'
+
+/**
+ * POST /api/cron/check-no-shows
+ * Trigger no-show checking and record creation for all hotels
+ * 
+ * Protected by CRON_SECRET environment variable
+ */
+export async function POST(request: Request) {
+  // Verify CRON secret
+  const secret = request.headers.get('authorization')?.replace('Bearer ', '')
+  if (secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // TODO: Implement jobExecution model
+  return NextResponse.json({ 
+    success: true, 
+    message: 'No-show checking not yet implemented' 
+  })
+}
+
+/* Old implementation - requires jobExecution model
+export async function POST_OLD(request: Request) {
+  try {
+    // Get all hotels
+    const hotels = await prisma.hotel.findMany({
+      select: { id: true, name: true }
+    })
+
+    console.log(`[CRON] Starting no-show checking for ${hotels.length} hotels`)
+
+    const results = await Promise.allSettled(
+      hotels.map(async (hotel) => {
+        const jobExecution = await prisma.jobExecution.create({
+          data: {
+            jobName: 'check-no-shows',
+            hotelId: hotel.id,
+            status: 'RUNNING'
+          }
+        })
+
+        try {
+          const result = await noShowCheckerService.checkAndProcessNoShows(hotel.id)
+
+          // Update job execution with success
+          await prisma.jobExecution.update({
+            where: { id: jobExecution.id },
+            data: {
+              status: 'COMPLETED',
+              metadata: {
+                noShowsDetected: result.noShowsDetected || 0,
+                penaltiesApplied: result.penaltiesApplied || 0,
+                roomsFreed: result.roomsFreed || 0,
+                timestamp: new Date().toISOString()
+              },
+              completedAt: new Date()
+            }
+          })
+
+          console.log(`[CRON] No-show checking completed for hotel ${hotel.id}`, result)
+          return { success: true, ...result }
+        } catch (error: any) {
+          // Update job execution with error
+          await prisma.jobExecution.update({
+            where: { id: jobExecution.id },
+            data: {
+              status: 'FAILED',
+              error: error.message,
+              completedAt: new Date()
+            }
+          })
+
+          console.error(`[CRON] No-show checking failed for hotel ${hotel.id}`, error)
+          return { hotelId: hotel.id, success: false, error: error.message }
+        }
+      })
+    )
+
+    // Collect results
+    const successCount = results.filter((r) => r.status === 'fulfilled').length
+    const failureCount = results.filter((r) => r.status === 'rejected').length
+
+    return NextResponse.json({
+      success: true,
+      message: `No-show checking executed for ${hotels.length} hotels`,
+      successCount,
+      failureCount,
+      timestamp: new Date().toISOString()
+    })
+  } catch (error: any) {
+    console.error('[CRON] No-show checking cron error:', error)
+    return NextResponse.json(
+      { error: error.message, success: false },
+      { status: 500 }
+    )
+  }
+}
+*/

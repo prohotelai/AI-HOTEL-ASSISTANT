@@ -1,0 +1,169 @@
+name: Database Migrations
+
+on:
+  pull_request:
+    paths:
+      - 'prisma/schema.prisma'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'prisma/schema.prisma'
+
+jobs:
+  validate-migration:
+    runs-on: ubuntu-latest
+    name: Validate Schema & Generate Migration
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: pms_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Check for empty migrations
+        run: |
+          npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --exit-code
+        continue-on-error: true
+
+      - name: Generate migration if needed
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/pms_test
+        run: |
+          npx prisma migrate dev --name "auto_$(date +%s)" --create-only || true
+
+      - name: Test migration up
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/pms_test
+        run: npx prisma migrate deploy
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Upload generated files
+        uses: actions/upload-artifact@v3
+        with:
+          name: prisma-generated
+          path: prisma/migrations/
+          retention-days: 1
+
+      - name: Comment on PR with migration details
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            
+            try {
+              const diff = execSync('git diff HEAD^..HEAD prisma/schema.prisma').toString();
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## Schema Changes\n\`\`\`diff\n${diff.substring(0, 3000)}\n\`\`\``
+              });
+            } catch (error) {
+              console.log('No schema changes detected');
+            }
+
+  migration-test:
+    runs-on: ubuntu-latest
+    name: Test Migration on Multiple DB Versions
+    needs: validate-migration
+    strategy:
+      matrix:
+        postgres-version: ['13', '14', '15']
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres-version }}
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: pms_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/pms_test
+        run: npx prisma migrate deploy
+
+      - name: Verify schema integrity
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/pms_test
+        run: npx prisma db execute --stdin < prisma/seed.ts
+
+  staging-migration:
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    name: Apply Migration to Staging
+    needs: validate-migration
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply migration to staging
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+        run: npx prisma migrate deploy
+
+      - name: Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: 'Staging database migration completed'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}

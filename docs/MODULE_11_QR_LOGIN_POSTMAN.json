@@ -1,0 +1,170 @@
+{
+  "info": {
+    "_postman_id": "pms-module-11-qr-login",
+    "name": "Module 11: PMS Guest Context & QR Login APIs",
+    "description": "Complete API collection for Module 11 QR Guest Login System\n\nEndpoints for:\n- Guest context retrieval\n- Room status and occupancy\n- Stay information and QR tokens\n- Check-in/Checkout with QR token generation/revocation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Guest Context APIs",
+      "item": [
+        {
+          "name": "GET Guest Context",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pms/guest/{{guestId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pms", "guest", "{{guestId}}"]
+            },
+            "description": "Retrieve guest profile with active stay information for QR login\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"guestContext\": {\n    \"guestId\": \"guest-uuid-1\",\n    \"hotelId\": \"hotel-uuid-1\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+1-555-0123\",\n    \"language\": \"en\",\n    \"vipStatus\": \"VIP\",\n    \"loyaltyTier\": \"GOLD\",\n    \"loyaltyPoints\": 1500,\n    \"preferences\": {\n      \"roomPreference\": \"high floor\",\n      \"dietary\": \"vegetarian\"\n    },\n    \"permissions\": {\n      \"canAccessServices\": true,\n      \"canRequestService\": true,\n      \"canViewBill\": true,\n      \"canOrderFood\": true,\n      \"canRequestHousekeeping\": true\n    }\n  },\n  \"hasActiveStay\": true\n}\n```"
+          },
+          "response": [
+            {
+              "name": "Guest with Active Stay",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{base_url}}/api/pms/guest/guest-1"
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"guestContext\": {\n    \"guestId\": \"guest-1\",\n    \"hotelId\": \"hotel-1\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+1-555-0123\",\n    \"language\": \"en\",\n    \"vipStatus\": \"VIP\",\n    \"loyaltyTier\": \"GOLD\",\n    \"loyaltyPoints\": 1500,\n    \"preferences\": {\"roomPreference\": \"high floor\"},\n    \"permissions\": {\n      \"canAccessServices\": true,\n      \"canRequestService\": true,\n      \"canViewBill\": true,\n      \"canOrderFood\": true,\n      \"canRequestHousekeeping\": true\n    }\n  },\n  \"hasActiveStay\": true\n}"
+            },
+            {
+              "name": "Guest without Active Stay",
+              "originalRequest": {
+                "method": "GET",\n                "url": "{{base_url}}/api/pms/guest/guest-2"
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"guestContext\": {\n    \"guestId\": \"guest-2\",\n    \"hotelId\": \"hotel-1\",\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Smith\",\n    \"email\": \"jane@example.com\",\n    \"phone\": null,\n    \"language\": \"en\",\n    \"vipStatus\": \"REGULAR\",\n    \"loyaltyTier\": null,\n    \"loyaltyPoints\": 0,\n    \"permissions\": {\n      \"canAccessServices\": false,\n      \"canRequestService\": false,\n      \"canViewBill\": false,\n      \"canOrderFood\": false,\n      \"canRequestHousekeeping\": false\n    }\n  },\n  \"hasActiveStay\": false\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Room Status APIs",
+      "item": [
+        {
+          "name": "GET Room Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pms/room/{{roomId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pms", "room", "{{roomId}}"]
+            },
+            "description": "Retrieve room details with current occupancy and guest info\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"room\": {\n    \"id\": \"room-uuid-1\",\n    \"number\": \"402\",\n    \"floor\": 4,\n    \"building\": \"Main\",\n    \"status\": \"OCCUPIED\",\n    \"isBlocked\": false,\n    \"isOccupied\": true,\n    \"roomType\": {\n      \"id\": \"roomtype-uuid-1\",\n      \"name\": \"Deluxe Suite\",\n      \"code\": \"DLX\",\n      \"bedType\": \"King\",\n      \"maxOccupancy\": 2,\n      \"amenities\": [\"WiFi\", \"TV\", \"Mini Bar\", \"Jacuzzi\"]\n    },\n    \"currentGuest\": {\n      \"guestId\": \"guest-uuid-1\",\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"vipStatus\": \"VIP\",\n      \"checkInTime\": \"2024-01-15T14:00:00Z\",\n      \"checkOutTime\": \"2024-01-17T11:00:00Z\"\n    },\n    \"lastCleanedAt\": \"2024-01-15T12:00:00Z\"\n  }\n}\n```"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stay & QR Token APIs",
+      "item": [
+        {
+          "name": "GET Stay Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pms/stay/{{stayId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pms", "stay", "{{stayId}}"]
+            },
+            "description": "Get complete stay information with QR tokens"
+          }
+        },
+        {
+          "name": "GET Active Stay (by Guest)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pms/stay/active?guestId={{guestId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pms", "stay", "active"],
+              "query": [
+                {
+                  "key": "guestId",
+                  "value": "{{guestId}}"
+                }
+              ]
+            },
+            "description": "Query active stay by guest ID"
+          }
+        },
+        {
+          "name": "GET Active Stay (by Room)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pms/stay/active?roomId={{roomId}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pms", "stay", "active"],
+              "query": [
+                {
+                  "key": "roomId",
+                  "value": "{{roomId}}"
+                }
+              ]
+            },
+            "description": "Query active stay by room ID"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Check-in/Checkout with QR Tokens",
+      "item": [
+        {
+          "name": "POST Check-in (with QR Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },\n              {\n                \"key\": \"Content-Type\",\n                \"value\": \"application/json\",\n                \"type\": \"text\"\n              }\n            ],\n            \"body\": {\n              \"mode\": \"raw\",\n              \"raw\": \"{\\n  \\\"bookingId\\\": \\\"booking-uuid-1\\\",\\n  \\\"identificationVerified\\\": true,\\n  \\\"issueKey\\\": true,\\n  \\\"keyType\\\": \\\"CARD\\\",\\n  \\\"notes\\\": \\\"Early arrival - requested high floor\\\"\\n}\"\n            },\n            \"url\": {\n              \"raw\": \"{{base_url}}/api/pms/checkin\",\n              \"host\": [\"{{base_url}}\"],\n              \"path\": [\"api\", \"pms\", \"checkin\"]\n            },\n            \"description\": \"Check in guest and generate QR token\\n\\n**Request Body:**\\n```json\\n{\\n  \\\"bookingId\\\": \\\"booking-1\\\",\\n  \\\"identificationVerified\\\": true,\\n  \\\"issueKey\\\": true,\\n  \\\"keyType\\\": \\\"CARD\\\"\\n}\\n```\\n\\n**Response:**\\n```json\\n{\\n  \\\"booking\\\": {...},\\n  \\\"folio\\\": {...},\\n  \\\"keyLog\\\": {...},\\n  \\\"qrToken\\\": {\\n    \\\"token\\\": \\\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\\\",\\n    \\\"stayId\\\": \\\"stay-uuid-1\\\",\\n    \\\"expiresAt\\\": \\\"2024-01-16T14:00:00Z\\\"\\n  },\\n  \\\"stayId\\\": \\\"stay-uuid-1\\\"\\n}\\n```\"\n          }\n        },\n        {\n          \"name\": \"POST Checkout (Revoke QR Tokens)\",\n          \"request\": {\n            \"method\": \"POST\",\n            \"header\": [\n              {\n                \"key\": \"Authorization\",\n                \"value\": \"Bearer {{access_token}}\",\n                \"type\": \"text\"\n              },\n              {\n                \"key\": \"Content-Type\",\n                \"value\": \"application/json\",\n                \"type\": \"text\"\n              }\n            ],\n            \"body\": {\n              \"mode\": \"raw\",\n              \"raw\": \"{\\n  \\\"bookingId\\\": \\\"booking-uuid-1\\\",\\n  \\\"generateInvoice\\\": true,\\n  \\\"returnAllKeys\\\": true,\\n  \\\"createHousekeepingTask\\\": true\\n}\"\n            },\n            \"url\": {\n              \"raw\": \"{{base_url}}/api/pms/checkout\",\n              \"host\": [\"{{base_url}}\"],\n              \"path\": [\"api\", \"pms\", \"checkout\"]\n            },\n            \"description\": \"Check out guest and revoke QR tokens\\n\\n**Response:**\\n```json\\n{\\n  \\\"booking\\\": {...},\\n  \\\"invoice\\\": {...},\\n  \\\"housekeepingTask\\\": {...},\\n  \\\"qrTokensRevoked\\\": 1\\n}\\n```\"\n          }\n        }\n      ]\n    }\n  ],\n  \"variable\": [\n    {\n      \"key\": \"base_url\",\n      \"value\": \"http://localhost:3000\",\n      \"type\": \"string\"\n    },\n    {\n      \"key\": \"access_token\",\n      \"value\": \"\",\n      \"type\": \"string\"\n    },\n    {\n      \"key\": \"guestId\",\n      \"value\": \"guest-1\",\n      \"type\": \"string\"\n    },\n    {\n      \"key\": \"roomId\",\n      \"value\": \"room-1\",\n      \"type\": \"string\"\n    },\n    {\n      \"key\": \"stayId\",\n      \"value\": \"stay-1\",\n      \"type\": \"string\"\n    },\n    {\n      \"key\": \"bookingId\",\n      \"value\": \"booking-1\",\n      \"type\": \"string\"\n    }\n  ]\n}\n

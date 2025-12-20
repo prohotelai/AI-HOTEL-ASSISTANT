@@ -1,0 +1,329 @@
+// ============================================================================
+// SESSION 5.6 - QR AUTOMATION & AI INTEGRATION SCHEMA ADDITIONS
+// ============================================================================
+// Add these models to your existing schema.prisma file
+
+// ============================================================================
+// 1. USER SESSION LOGS - Track all QR scans and session creation
+// ============================================================================
+model UserSessionLog {
+  id                    String      @id @default(cuid())
+  hotelId               String
+  hotel                 Hotel       @relation(fields: [hotelId], references: [id])
+  
+  // User info
+  userId                String
+  userRole              String      @db.VarChar(50) // guest, staff, admin
+  userName              String?
+  userEmail             String?
+  
+  // Session info
+  sessionId             String      @unique
+  qrTokenId             String?
+  qrToken               GuestStaffQRToken? @relation(fields: [qrTokenId], references: [id])
+  
+  // JWT & validation
+  sessionJWT            String      @db.Text
+  jwtExpiresAt          DateTime
+  
+  // Scan details
+  scanMethod            String      @db.VarChar(50) // qr_camera, qr_manual, nfc, rfid, manual_entry
+  scanDeviceId          String?     // Device identifier for analytics
+  scanLocation          String?     // Physical location of scan
+  ipAddress             String?
+  userAgent             String?     @db.Text
+  
+  // Workflow trigger
+  workflowTriggered     Boolean     @default(false)
+  workflowStatus        String      @db.VarChar(50) // pending, started, completed, failed
+  workflowStartedAt     DateTime?
+  workflowCompletedAt   DateTime?
+  
+  // AI models triggered
+  aiModelsTriggered     String      @db.Text // JSON array of model IDs
+  
+  // Context
+  context               Json?       // Additional context data
+  
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  expiresAt             DateTime    // Auto-delete after session expiry
+  
+  // Relations
+  aiInteractions        AIInteractionLog[]
+  
+  @@index([hotelId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// 2. AI INTERACTION LOGS - Track all AI model invocations and results
+// ============================================================================
+model AIInteractionLog {
+  id                    String      @id @default(cuid())
+  hotelId               String
+  hotel                 Hotel       @relation(fields: [hotelId], references: [id])
+  
+  // Session reference
+  sessionId             String
+  session               UserSessionLog @relation(fields: [sessionId], references: [sessionId])
+  
+  // AI model info
+  modelId               String      @db.VarChar(100) // night-audit, task-routing, etc.
+  modelName             String      @db.VarChar(200)
+  modelVersion          String?     @db.VarChar(50)
+  
+  // User context
+  userId                String
+  userRole              String      @db.VarChar(50)
+  
+  // Request details
+  requestPayload        Json        // Full request to AI model
+  requestTokens        Int?         // Tokens used (for LLM models)
+  
+  // Response details
+  responsePayload       Json        // Full response from AI model
+  responseTokens       Int?         // Tokens used (for LLM models)
+  
+  // Execution
+  status                String      @db.VarChar(50) // success, failed, timeout, partial
+  executionTimeMs       Int         // Milliseconds taken
+  errorMessage          String?     @db.Text
+  
+  // Actions triggered by AI
+  actionsTriggered      Json?       // Array of actions taken based on AI output
+  actionsExecuted       Json?       // Status of each executed action
+  
+  // PMS & System updates
+  pmsUpdateTriggered    Boolean     @default(false)
+  ticketCreated         Boolean     @default(false)
+  ticketId              String?
+  
+  // Audit & compliance
+  auditTrail            Json?       // Complete audit trail of this interaction
+  complianceChecks      Json?       // Compliance checks performed
+  
+  // Analytics
+  confidence            Float?      // Model confidence score (0-1)
+  costEstimate          Float?      // Estimated cost if paid API
+  
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@index([hotelId])
+  @@index([sessionId])
+  @@index([modelId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// 3. WORKFLOW STATE - Track in-progress workflows for offline sync
+// ============================================================================
+model WorkflowState {
+  id                    String      @id @default(cuid())
+  hotelId               String
+  hotel                 Hotel       @relation(fields: [hotelId], references: [id])
+  
+  // Session reference
+  sessionId             String      @unique
+  
+  // Workflow info
+  workflowId            String
+  userRole              String      @db.VarChar(50)
+  status                String      @db.VarChar(50) // queued, processing, paused, completed, failed
+  
+  // Payload & state
+  initialPayload        Json        // Original request
+  currentState          Json        // Current workflow state
+  completedSteps        String      @db.Text // Comma-separated completed step IDs
+  nextSteps             String      @db.Text // JSON array of next steps
+  
+  // Retry info
+  retryCount            Int         @default(0)
+  maxRetries            Int         @default(3)
+  lastRetryAt           DateTime?
+  
+  // For offline sync
+  requiresSync          Boolean     @default(false)
+  syncAttempts          Int         @default(0)
+  lastSyncAt            DateTime?
+  
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  expiresAt             DateTime    // Auto-cleanup after workflow completion
+  
+  @@index([hotelId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// 4. QR TOKEN ENHANCEMENTS
+// ============================================================================
+// Add these fields to existing GuestStaffQRToken model:
+/*
+  // Workflow tracking
+  lastSessionLogId      String?     // Reference to latest session
+  sessionCount          Int         @default(0)
+  
+  // Analytics
+  totalAIModelsTriggered Int       @default(0)
+  totalPMSUpdates       Int         @default(0)
+  totalTicketsCreated   Int         @default(0)
+  
+  // Usage tracking
+  lastUsedAt            DateTime?
+  lastUsedLocation      String?
+  usageHistory          Json?       // Array of usage events
+  
+  // Relations
+  sessionLogs           UserSessionLog[]
+*/
+
+// ============================================================================
+// 5. PMS WORK ORDER HISTORY - Audit trail for PMS updates
+// ============================================================================
+model PMSWorkOrderHistory {
+  id                    String      @id @default(cuid())
+  hotelId               String
+  hotel                 Hotel       @relation(fields: [hotelId], references: [id])
+  
+  // Reference
+  workOrderId           String
+  
+  // Trigger source
+  sourceType            String      @db.VarChar(100) // ai_automation, manual, import, api
+  sourceId              String?     // Reference to triggering AI interaction or user
+  sessionId             String?     // Session that triggered this
+  
+  // Changes
+  previousState         Json?       // State before change
+  newState              Json        // State after change
+  fieldChanges          Json        // { fieldName: { old, new } }
+  
+  // Status
+  syncStatus            String      @db.VarChar(50) // pending, synced, failed, conflict
+  syncAttempts          Int         @default(0)
+  lastSyncError         String?     @db.Text
+  
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  syncedAt              DateTime?
+  
+  @@index([hotelId])
+  @@index([workOrderId])
+  @@index([sourceId])
+  @@index([syncStatus])
+}
+
+// ============================================================================
+// 6. AI ANALYTICS SUMMARY - Aggregated metrics for dashboard
+// ============================================================================
+model AIAnalyticsSummary {
+  id                    String      @id @default(cuid())
+  hotelId               String      @unique
+  hotel                 Hotel       @relation(fields: [hotelId], references: [id])
+  
+  // Time period
+  period                String      @db.VarChar(50) // hourly, daily, weekly, monthly
+  periodStart           DateTime
+  periodEnd             DateTime
+  
+  // Metrics
+  totalScans            Int         @default(0)
+  guestScans            Int         @default(0)
+  staffScans            Int         @default(0)
+  
+  totalAITriggers       Int         @default(0)
+  successfulTriggers    Int         @default(0)
+  failedTriggers        Int         @default(0)
+  
+  totalTokensUsed       BigInt      @default(0)
+  averageExecutionMs    Float       @default(0)
+  
+  totalPMSUpdates       Int         @default(0)
+  totalTicketsCreated   Int         @default(0)
+  
+  // AI Model breakdown
+  modelMetrics          Json        // { modelId: { triggers, successes, failures } }
+  
+  // Cost metrics
+  estimatedCost         Float       @default(0)
+  
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@index([hotelId])
+  @@index([periodStart])
+}
+
+// ============================================================================
+// 7. WORKFLOW EXECUTION HISTORY - Detailed workflow audit
+// ============================================================================
+model WorkflowExecutionHistory {
+  id                    String      @id @default(cuid())
+  hotelId               String
+  hotel                 Hotel       @relation(fields: [hotelId], references: [id])
+  
+  // Session reference
+  sessionId             String
+  
+  // Workflow info
+  workflowId            String
+  workflowName          String      @db.Text
+  
+  // User info
+  userId                String
+  userRole              String      @db.VarChar(50)
+  
+  // Execution details
+  steps                 Json        // Array of step executions: { id, name, status, duration, result }
+  
+  // Overall status
+  status                String      @db.VarChar(50) // success, partial_success, failed
+  totalDuration         Int         // Milliseconds
+  
+  // Error tracking
+  errors                Json?       // Array of errors encountered
+  warnings              Json?       // Array of warnings
+  
+  // Compliance & audit
+  auditLog              Json        // Complete audit trail
+  complianceReport      Json?       // Compliance check results
+  
+  // Context
+  context               Json?       // Original request context
+  
+  // Timestamps
+  startedAt             DateTime
+  completedAt           DateTime
+  createdAt             DateTime    @default(now())
+  
+  @@index([hotelId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// RELATIONS TO HOTEL
+// ============================================================================
+// Add these to the Hotel model:
+/*
+  userSessionLogs           UserSessionLog[]
+  aiInteractionLogs         AIInteractionLog[]
+  workflowStates            WorkflowState[]
+  pmsWorkOrderHistory       PMSWorkOrderHistory[]
+  aiAnalyticsSummary        AIAnalyticsSummary?
+  workflowExecutionHistory  WorkflowExecutionHistory[]
+*/

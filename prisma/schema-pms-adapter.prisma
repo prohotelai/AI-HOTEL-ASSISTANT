@@ -1,0 +1,226 @@
+// ============================================================================
+// PMS ADAPTER LAYER - ISOLATED SCHEMA
+// ============================================================================
+// This file contains ONLY new tables for the PMS Adapter module.
+// 
+// ⚠️ IMPORTANT: These models must be added to the main schema.prisma ONLY
+// when ready to deploy. This file is for documentation and safety.
+//
+// 📦 To apply: Copy these models to the END of prisma/schema.prisma
+// ============================================================================
+
+// ============================================================================
+// 1. PMS Integration Configuration
+// ============================================================================
+model PMSIntegration {
+  id        String   @id @default(cuid())
+  
+  // Multi-tenant: belongs to hotel
+  hotelId   String
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  // PMS Details
+  pmsName   String   // e.g., "Opera", "Mews", "Protel", "Custom"
+  pmsType   String   // "CLOUD" | "ON_PREMISE" | "LEGACY"
+  version   String?  // PMS version if applicable
+  
+  // Connection Details
+  baseUrl   String?  @db.Text // API base URL (if applicable)
+  authType  String   // "API_KEY" | "OAUTH" | "BASIC" | "CUSTOM"
+  
+  // Encrypted credentials (JSON)
+  credentialsEncrypted String @db.Text
+  
+  // Integration Mode
+  mode      String   // "SAAS_ONLY" | "EXTERNAL_ONLY" | "HYBRID"
+  
+  // Status
+  enabled   Boolean  @default(false)
+  isActive  Boolean  @default(false) // Actively syncing?
+  lastTestAt DateTime?
+  lastTestStatus String? // "SUCCESS" | "FAILED"
+  lastTestError  String? @db.Text
+  
+  // Sync Configuration
+  syncIntervalMinutes Int? @default(15) // How often to sync (if enabled)
+  autoSyncEnabled     Boolean @default(false)
+  
+  // Metadata
+  metadata  Json?    // Additional config (JSON)
+  
+  // Relations
+  config    PMSAdapterConfig?
+  syncLogs  PMSSyncLog[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([hotelId]) // One integration per hotel
+  @@index([hotelId])
+  @@index([enabled])
+  @@index([isActive])
+}
+
+// ============================================================================
+// 2. PMS Adapter Configuration (Entity Mappings)
+// ============================================================================
+model PMSAdapterConfig {
+  id             String   @id @default(cuid())
+  
+  // Belongs to integration
+  integrationId  String   @unique
+  integration    PMSIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  // Entity Mappings (JSON)
+  // Maps external PMS fields to our internal schema
+  entityMappings Json     @db.JsonB
+  // Example structure:
+  // {
+  //   "rooms": { "externalId": "RoomCode", "name": "RoomName", ... },
+  //   "bookings": { "externalId": "ReservationID", ... },
+  //   "guests": { ... }
+  // }
+  
+  // Sync Configuration
+  syncDirection  String   @default("BIDIRECTIONAL") // "PULL_ONLY" | "PUSH_ONLY" | "BIDIRECTIONAL"
+  
+  // Conflict Resolution Strategy
+  conflictStrategy String @default("EXTERNAL_WINS") // "EXTERNAL_WINS" | "INTERNAL_WINS" | "MANUAL"
+  
+  // Supported Modules (JSON array)
+  supportedModules Json   @default("[]")
+  // Example: ["rooms", "bookings", "guests", "invoices"]
+  
+  // Field Transformations (optional)
+  fieldTransformations Json? @db.JsonB
+  // Custom transformation rules for complex mappings
+  
+  // Validation Rules
+  validationRules Json? @db.JsonB
+  // Data validation before sync
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([integrationId])
+}
+
+// ============================================================================
+// 3. PMS Sync Logs (Audit Trail)
+// ============================================================================
+model PMSSyncLog {
+  id             String   @id @default(cuid())
+  
+  // Belongs to hotel and integration
+  hotelId        String
+  integrationId  String
+  integration    PMSIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  // Sync Details
+  entity         String   // "rooms" | "bookings" | "guests" | "invoices"
+  direction      String   // "PULL" | "PUSH"
+  
+  // Status
+  status         String   // "SUCCESS" | "PARTIAL" | "FAILED"
+  recordsProcessed Int?   @default(0)
+  recordsSuccess   Int?   @default(0)
+  recordsFailed    Int?   @default(0)
+  
+  // Error Information
+  error          String?  @db.Text
+  errorDetails   Json?    @db.JsonB // Detailed error info
+  
+  // Performance Metrics
+  durationMs     Int?     // How long the sync took
+  
+  // Metadata
+  triggeredBy    String?  // "AUTO" | "MANUAL" | "WEBHOOK" | user ID
+  metadata       Json?    @db.JsonB
+  
+  timestamp      DateTime @default(now())
+  
+  @@index([hotelId])
+  @@index([integrationId])
+  @@index([entity])
+  @@index([status])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// 4. PMS Sync Queue (Background Jobs)
+// ============================================================================
+model PMSSyncQueue {
+  id             String   @id @default(cuid())
+  
+  // Belongs to hotel
+  hotelId        String
+  integrationId  String
+  
+  // Job Details
+  entity         String   // "rooms" | "bookings" | "guests"
+  direction      String   // "PULL" | "PUSH"
+  priority       Int      @default(5) // 1-10, higher = more urgent
+  
+  // Status
+  status         String   @default("PENDING") // "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"
+  attempts       Int      @default(0)
+  maxAttempts    Int      @default(3)
+  
+  // Scheduling
+  scheduledFor   DateTime @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  
+  // Error Handling
+  lastError      String?  @db.Text
+  
+  // Payload (specific records to sync, if applicable)
+  payload        Json?    @db.JsonB
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@index([hotelId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([priority])
+}
+
+// ============================================================================
+// 5. PMS Field Mappings (Cache/Reference)
+// ============================================================================
+model PMSFieldMapping {
+  id             String   @id @default(cuid())
+  
+  // Belongs to integration
+  integrationId  String
+  
+  // Entity and Field
+  entity         String   // "rooms" | "bookings" | "guests"
+  
+  // Internal field (our schema)
+  internalField  String
+  internalType   String   // "string" | "number" | "date" | "boolean"
+  
+  // External field (PMS schema)
+  externalField  String
+  externalType   String?
+  
+  // Transformation
+  transformType  String?  // "DIRECT" | "CUSTOM" | "LOOKUP"
+  transformCode  String?  @db.Text // Custom JS transformation code
+  
+  // Validation
+  isRequired     Boolean  @default(false)
+  validationRule String?  @db.Text
+  
+  // Metadata
+  description    String?  @db.Text
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@unique([integrationId, entity, internalField])
+  @@index([integrationId])
+  @@index([entity])
+}

@@ -1,0 +1,104 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { withPermission } from '@/lib/middleware/rbac'
+import { Permission } from '@/lib/rbac'
+import { availabilityService } from '@/lib/services/pms/availabilityService'
+import { maintenanceService } from '@/lib/services/pms/maintenanceService'
+import { inventoryService } from '@/lib/services/pms/inventoryService'
+import { invoiceService } from '@/lib/services/pms/invoiceService'
+import { keyService } from '@/lib/services/pms/keyService'
+
+// GET /api/pms/reports - Get PMS reports
+export const GET = withPermission(Permission.ADMIN_VIEW)(async (request: NextRequest) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type')
+    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : new Date(new Date().setDate(new Date().getDate() - 30))
+    const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : new Date()
+
+    let report: any = null
+
+    switch (type) {
+      case 'occupancy':
+        report = await availabilityService.getOccupancyStats(
+          user.hotelId,
+          startDate,
+          endDate
+        )
+        break
+
+      case 'maintenance':
+        report = await maintenanceService.getMaintenanceStats(
+          user.hotelId,
+          startDate,
+          endDate
+        )
+        break
+
+      case 'inventory':
+        report = await inventoryService.getInventoryStats(
+          user.hotelId
+        )
+        break
+
+      case 'inventory-value':
+        const groupBy = searchParams.get('groupBy') as 'category' | 'supplier' || 'category'
+        report = await inventoryService.getInventoryValueReport(
+          user.hotelId,
+          groupBy
+        )
+        break
+
+      case 'financial':
+        report = await invoiceService.getInvoiceStats(
+          user.hotelId,
+          startDate,
+          endDate
+        )
+        break
+
+      case 'keys':
+        report = await keyService.getKeyStats(
+          user.hotelId,
+          startDate,
+          endDate
+        )
+        break
+
+      case 'unreturned-keys':
+        report = await keyService.getUnreturnedKeysReport(
+          user.hotelId
+        )
+        break
+
+      case 'reorder':
+        report = await inventoryService.generateReorderReport(
+          user.hotelId
+        )
+        break
+
+      default:
+        return NextResponse.json(
+          { error: 'Invalid report type' },
+          { status: 400 }
+        )
+    }
+
+    return NextResponse.json({
+      type,
+      startDate,
+      endDate,
+      data: report
+    })
+  } catch (error: any) {
+    console.error('Error generating report:', error)
+    return NextResponse.json(
+      { error: 'Failed to generate report' },
+      { status: 500 }
+    )
+  }
+})

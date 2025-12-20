@@ -1,0 +1,792 @@
+/**
+ * Staff Service Layer
+ * Handles all staff profile operations, activity logging, and business logic
+ */
+
+import { prisma } from '@/lib/prisma'
+import { eventBus } from '@/lib/events/eventBus'
+import type {
+  StaffProfile,
+  Department,
+  HRNote,
+  PerformanceMetric,
+  StaffActivity,
+  StaffDocument,
+  CalendarEvent,
+  PerformanceReview,
+  EmploymentStatus,
+  ActivityType,
+  PerformanceRating
+} from '@prisma/client'
+
+// ============================================
+// TYPES
+// ============================================
+
+export interface CreateStaffProfileInput {
+  userId: string
+  hotelId: string
+  firstName: string
+  lastName: string
+  phoneNumber?: string
+  dateOfBirth?: Date
+  address?: string
+  city?: string
+  country?: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  employeeId?: string
+  departmentId?: string
+  position?: string
+  employmentStatus?: EmploymentStatus
+  startDate?: Date
+  salary?: number
+  hourlyRate?: number
+  bio?: string
+  avatar?: string
+  skills?: string[]
+  certifications?: string[]
+  languages?: string[]
+}
+
+export interface UpdateStaffProfileInput {
+  firstName?: string
+  lastName?: string
+  phoneNumber?: string
+  dateOfBirth?: Date
+  address?: string
+  city?: string
+  country?: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  departmentId?: string
+  position?: string
+  employmentStatus?: EmploymentStatus
+  endDate?: Date
+  salary?: number
+  hourlyRate?: number
+  bio?: string
+  avatar?: string
+  skills?: string[]
+  certifications?: string[]
+  languages?: string[]
+  notificationsEnabled?: boolean
+  timezone?: string
+}
+
+export interface StaffListFilters {
+  hotelId: string
+  departmentId?: string
+  employmentStatus?: EmploymentStatus
+  search?: string
+  limit?: number
+  offset?: number
+}
+
+export interface CreateActivityInput {
+  staffProfileId: string
+  type: ActivityType
+  title: string
+  description?: string
+  metadata?: Record<string, any>
+  triggeredBy?: string
+}
+
+// ============================================
+// STAFF PROFILE OPERATIONS
+// ============================================
+
+export async function createStaffProfile(input: CreateStaffProfileInput): Promise<StaffProfile> {
+  const profile = await prisma.staffProfile.create({
+    data: {
+      userId: input.userId,
+      hotelId: input.hotelId,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phoneNumber: input.phoneNumber,
+      dateOfBirth: input.dateOfBirth,
+      address: input.address,
+      city: input.city,
+      country: input.country,
+      emergencyContact: input.emergencyContact,
+      emergencyPhone: input.emergencyPhone,
+      employeeId: input.employeeId,
+      departmentId: input.departmentId,
+      position: input.position,
+      employmentStatus: input.employmentStatus || 'ACTIVE',
+      startDate: input.startDate || new Date(),
+      salary: input.salary,
+      hourlyRate: input.hourlyRate,
+      bio: input.bio,
+      avatar: input.avatar,
+      skills: input.skills || [],
+      certifications: input.certifications || [],
+      languages: input.languages || []
+    },
+    include: {
+      user: true,
+      department: true
+    }
+  })
+
+  // Log activity
+  await logActivity({
+    staffProfileId: profile.id,
+    type: 'PROFILE_UPDATED',
+    title: 'Staff profile created',
+    description: `${input.firstName} ${input.lastName} joined the team`
+  })
+
+  // Emit event
+  eventBus.emit('staff.profile.created', {
+    profileId: profile.id,
+    userId: profile.userId,
+    hotelId: profile.hotelId,
+    timestamp: new Date()
+  })
+
+  return profile
+}
+
+export async function getStaffProfile(profileId: string) {
+  return prisma.staffProfile.findUnique({
+    where: { id: profileId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true
+        }
+      },
+      department: true,
+      hrNotes: {
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      },
+      performanceMetrics: {
+        orderBy: { createdAt: 'desc' },
+        take: 10
+      },
+      activities: {
+        orderBy: { createdAt: 'desc' },
+        take: 20
+      },
+      documents: {
+        orderBy: { createdAt: 'desc' }
+      },
+      calendarEvents: {
+        where: {
+          startTime: {
+            gte: new Date()
+          }
+        },
+        orderBy: { startTime: 'asc' },
+        take: 10
+      }
+    }
+  })
+}
+
+export async function getStaffProfileByUserId(userId: string) {
+  return prisma.staffProfile.findUnique({
+    where: { userId },
+    include: {
+      user: true,
+      department: true
+    }
+  })
+}
+
+export async function listStaffProfiles(filters: StaffListFilters) {
+  const where: any = {
+    hotelId: filters.hotelId
+  }
+
+  if (filters.departmentId) {
+    where.departmentId = filters.departmentId
+  }
+
+  if (filters.employmentStatus) {
+    where.employmentStatus = filters.employmentStatus
+  }
+
+  if (filters.search) {
+    where.OR = [
+      { firstName: { contains: filters.search, mode: 'insensitive' } },
+      { lastName: { contains: filters.search, mode: 'insensitive' } },
+      { employeeId: { contains: filters.search, mode: 'insensitive' } },
+      { position: { contains: filters.search, mode: 'insensitive' } },
+      { user: { email: { contains: filters.search, mode: 'insensitive' } } }
+    ]
+  }
+
+  const [profiles, total] = await Promise.all([
+    prisma.staffProfile.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true
+          }
+        },
+        department: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: filters.limit || 50,
+      skip: filters.offset || 0
+    }),
+    prisma.staffProfile.count({ where })
+  ])
+
+  return { profiles, total }
+}
+
+export async function updateStaffProfile(
+  profileId: string,
+  input: UpdateStaffProfileInput,
+  updatedBy?: string
+): Promise<StaffProfile> {
+  const profile = await prisma.staffProfile.update({
+    where: { id: profileId },
+    data: input,
+    include: {
+      user: true,
+      department: true
+    }
+  })
+
+  // Log activity
+  const changes = Object.keys(input).join(', ')
+  await logActivity({
+    staffProfileId: profileId,
+    type: 'PROFILE_UPDATED',
+    title: 'Profile updated',
+    description: `Updated fields: ${changes}`,
+    triggeredBy: updatedBy
+  })
+
+  // Emit event
+  eventBus.emit('staff.profile.updated', {
+    profileId: profile.id,
+    userId: profile.userId,
+    hotelId: profile.hotelId,
+    changes: input,
+    timestamp: new Date()
+  })
+
+  return profile
+}
+
+export async function deleteStaffProfile(profileId: string): Promise<void> {
+  const profile = await prisma.staffProfile.findUnique({
+    where: { id: profileId }
+  })
+
+  if (!profile) {
+    throw new Error('Staff profile not found')
+  }
+
+  await prisma.staffProfile.delete({
+    where: { id: profileId }
+  })
+
+  // Emit event
+  eventBus.emit('staff.profile.deleted', {
+    profileId,
+    userId: profile.userId,
+    hotelId: profile.hotelId,
+    timestamp: new Date()
+  })
+}
+
+// ============================================
+// DEPARTMENT OPERATIONS
+// ============================================
+
+export async function createDepartment(
+  hotelId: string,
+  name: string,
+  description?: string,
+  color?: string
+) {
+  return prisma.department.create({
+    data: {
+      hotelId,
+      name,
+      description,
+      color: color || '#3B82F6'
+    }
+  })
+}
+
+export async function listDepartments(hotelId: string) {
+  return prisma.department.findMany({
+    where: { hotelId },
+    include: {
+      _count: {
+        select: { staffProfiles: true }
+      }
+    },
+    orderBy: { name: 'asc' }
+  })
+}
+
+export async function updateDepartment(
+  departmentId: string,
+  data: { name?: string; description?: string; color?: string }
+) {
+  return prisma.department.update({
+    where: { id: departmentId },
+    data
+  })
+}
+
+export async function deleteDepartment(departmentId: string) {
+  // Check if department has staff
+  const count = await prisma.staffProfile.count({
+    where: { departmentId }
+  })
+
+  if (count > 0) {
+    throw new Error('Cannot delete department with active staff members')
+  }
+
+  return prisma.department.delete({
+    where: { id: departmentId }
+  })
+}
+
+// ============================================
+// ACTIVITY LOGGING
+// ============================================
+
+export async function logActivity(input: CreateActivityInput): Promise<StaffActivity> {
+  return prisma.staffActivity.create({
+    data: {
+      staffProfileId: input.staffProfileId,
+      type: input.type,
+      title: input.title,
+      description: input.description,
+      metadata: input.metadata,
+      triggeredBy: input.triggeredBy
+    }
+  })
+}
+
+export async function getStaffActivities(
+  staffProfileId: string,
+  limit: number = 50
+): Promise<StaffActivity[]> {
+  return prisma.staffActivity.findMany({
+    where: { staffProfileId },
+    orderBy: { createdAt: 'desc' },
+    take: limit
+  })
+}
+
+// ============================================
+// HR NOTES
+// ============================================
+
+export async function createHRNote(
+  staffProfileId: string,
+  title: string,
+  content: string,
+  createdBy: string,
+  isConfidential: boolean = false,
+  tags: string[] = [],
+  attachments: string[] = []
+): Promise<HRNote> {
+  const note = await prisma.hRNote.create({
+    data: {
+      staffProfileId,
+      title,
+      content,
+      createdBy,
+      isConfidential,
+      tags,
+      attachments
+    }
+  })
+
+  // Log activity
+  await logActivity({
+    staffProfileId,
+    type: 'NOTE_ADDED',
+    title: 'HR note added',
+    description: title,
+    triggeredBy: createdBy
+  })
+
+  return note
+}
+
+export async function getHRNotes(staffProfileId: string): Promise<HRNote[]> {
+  return prisma.hRNote.findMany({
+    where: { staffProfileId },
+    orderBy: { createdAt: 'desc' }
+  })
+}
+
+export async function updateHRNote(
+  noteId: string,
+  data: {
+    title?: string
+    content?: string
+    isConfidential?: boolean
+    tags?: string[]
+    attachments?: string[]
+  }
+): Promise<HRNote> {
+  return prisma.hRNote.update({
+    where: { id: noteId },
+    data
+  })
+}
+
+export async function deleteHRNote(noteId: string): Promise<void> {
+  await prisma.hRNote.delete({
+    where: { id: noteId }
+  })
+}
+
+// ============================================
+// PERFORMANCE METRICS
+// ============================================
+
+export async function logPerformanceMetric(
+  staffProfileId: string,
+  name: string,
+  value: number,
+  periodStart: Date,
+  periodEnd: Date,
+  recordedBy: string,
+  target?: number,
+  unit?: string,
+  notes?: string
+): Promise<PerformanceMetric> {
+  const metric = await prisma.performanceMetric.create({
+    data: {
+      staffProfileId,
+      name,
+      value,
+      target,
+      unit,
+      periodStart,
+      periodEnd,
+      notes,
+      recordedBy
+    }
+  })
+
+  // Log activity
+  await logActivity({
+    staffProfileId,
+    type: 'PERFORMANCE_LOGGED',
+    title: 'Performance metric logged',
+    description: `${name}: ${value}${unit || ''}`,
+    triggeredBy: recordedBy
+  })
+
+  return metric
+}
+
+export async function getPerformanceMetrics(
+  staffProfileId: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<PerformanceMetric[]> {
+  const where: any = { staffProfileId }
+
+  if (startDate || endDate) {
+    where.periodStart = {}
+    if (startDate) where.periodStart.gte = startDate
+    if (endDate) where.periodEnd = { lte: endDate }
+  }
+
+  return prisma.performanceMetric.findMany({
+    where,
+    orderBy: { periodStart: 'desc' }
+  })
+}
+
+// ============================================
+// DOCUMENTS
+// ============================================
+
+export async function uploadStaffDocument(
+  staffProfileId: string,
+  title: string,
+  fileUrl: string,
+  fileName: string,
+  fileSize: number,
+  mimeType: string,
+  uploadedBy: string,
+  category?: string,
+  description?: string,
+  tags: string[] = [],
+  isConfidential: boolean = false
+): Promise<StaffDocument> {
+  const document = await prisma.staffDocument.create({
+    data: {
+      staffProfileId,
+      title,
+      description,
+      fileUrl,
+      fileName,
+      fileSize,
+      mimeType,
+      category,
+      tags,
+      isConfidential,
+      uploadedBy
+    }
+  })
+
+  // Log activity
+  await logActivity({
+    staffProfileId,
+    type: 'DOCUMENT_UPLOADED',
+    title: 'Document uploaded',
+    description: title,
+    triggeredBy: uploadedBy
+  })
+
+  return document
+}
+
+export async function getStaffDocuments(
+  staffProfileId: string,
+  category?: string
+): Promise<StaffDocument[]> {
+  const where: any = { staffProfileId }
+  if (category) where.category = category
+
+  return prisma.staffDocument.findMany({
+    where,
+    orderBy: { createdAt: 'desc' }
+  })
+}
+
+export async function deleteStaffDocument(documentId: string): Promise<void> {
+  await prisma.staffDocument.delete({
+    where: { id: documentId }
+  })
+}
+
+// ============================================
+// CALENDAR EVENTS
+// ============================================
+
+export async function createCalendarEvent(
+  staffProfileId: string,
+  title: string,
+  startTime: Date,
+  endTime: Date,
+  createdBy: string,
+  eventType: string = 'shift',
+  description?: string,
+  location?: string,
+  isRecurring: boolean = false,
+  recurrenceRule?: string,
+  color?: string,
+  isAllDay: boolean = false,
+  reminders: number[] = []
+): Promise<CalendarEvent> {
+  return prisma.calendarEvent.create({
+    data: {
+      staffProfileId,
+      title,
+      description,
+      startTime,
+      endTime,
+      location,
+      eventType,
+      isRecurring,
+      recurrenceRule,
+      color: color || '#3B82F6',
+      isAllDay,
+      reminders,
+      createdBy
+    }
+  })
+}
+
+export async function getCalendarEvents(
+  staffProfileId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<CalendarEvent[]> {
+  return prisma.calendarEvent.findMany({
+    where: {
+      staffProfileId,
+      startTime: {
+        gte: startDate,
+        lte: endDate
+      }
+    },
+    orderBy: { startTime: 'asc' }
+  })
+}
+
+export async function updateCalendarEvent(
+  eventId: string,
+  data: {
+    title?: string
+    description?: string
+    startTime?: Date
+    endTime?: Date
+    location?: string
+    status?: string
+  }
+): Promise<CalendarEvent> {
+  return prisma.calendarEvent.update({
+    where: { id: eventId },
+    data
+  })
+}
+
+export async function deleteCalendarEvent(eventId: string): Promise<void> {
+  await prisma.calendarEvent.delete({
+    where: { id: eventId }
+  })
+}
+
+// ============================================
+// PERFORMANCE REVIEWS
+// ============================================
+
+export async function createPerformanceReview(
+  staffProfileId: string,
+  title: string,
+  content: string,
+  reviewDate: Date,
+  reviewPeriodStart: Date,
+  reviewPeriodEnd: Date,
+  reviewerId: string,
+  overallRating?: PerformanceRating,
+  ratings?: Record<string, any>,
+  strengths?: string,
+  areasForImprovement?: string,
+  goals?: string
+): Promise<PerformanceReview> {
+  const review = await prisma.performanceReview.create({
+    data: {
+      staffProfileId,
+      title,
+      content,
+      reviewDate,
+      reviewPeriodStart,
+      reviewPeriodEnd,
+      overallRating,
+      ratings,
+      strengths,
+      areasForImprovement,
+      goals,
+      reviewerId
+    }
+  })
+
+  // Log activity
+  await logActivity({
+    staffProfileId,
+    type: 'REVIEW_COMPLETED',
+    title: 'Performance review completed',
+    description: title,
+    triggeredBy: reviewerId
+  })
+
+  return review
+}
+
+export async function getPerformanceReviews(staffProfileId: string): Promise<PerformanceReview[]> {
+  return prisma.performanceReview.findMany({
+    where: { staffProfileId },
+    orderBy: { reviewDate: 'desc' }
+  })
+}
+
+export async function updatePerformanceReview(
+  reviewId: string,
+  data: {
+    title?: string
+    content?: string
+    overallRating?: PerformanceRating
+    ratings?: Record<string, any>
+    strengths?: string
+    areasForImprovement?: string
+    goals?: string
+    status?: string
+    employeeSignature?: string
+    signedAt?: Date
+  }
+): Promise<PerformanceReview> {
+  return prisma.performanceReview.update({
+    where: { id: reviewId },
+    data
+  })
+}
+
+// ============================================
+// STATISTICS
+// ============================================
+
+export async function getStaffStatistics(hotelId: string) {
+  const [
+    totalStaff,
+    activeStaff,
+    departments,
+    recentActivities,
+    upcomingReviews
+  ] = await Promise.all([
+    prisma.staffProfile.count({ where: { hotelId } }),
+    prisma.staffProfile.count({ where: { hotelId, employmentStatus: 'ACTIVE' } }),
+    prisma.department.count({ where: { hotelId } }),
+    prisma.staffActivity.findMany({
+      where: {
+        staffProfile: { hotelId }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      include: {
+        staffProfile: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    }),
+    prisma.performanceReview.findMany({
+      where: {
+        staffProfile: { hotelId },
+        reviewDate: {
+          gte: new Date(),
+          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days
+        }
+      },
+      include: {
+        staffProfile: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      },
+      orderBy: { reviewDate: 'asc' }
+    })
+  ])
+
+  return {
+    totalStaff,
+    activeStaff,
+    departments,
+    recentActivities,
+    upcomingReviews
+  }
+}

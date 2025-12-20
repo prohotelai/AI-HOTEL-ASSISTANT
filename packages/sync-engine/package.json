@@ -1,0 +1,35 @@
+{
+  "name": "@pms/sync-engine",
+  "version": "1.0.0",
+  "description": "Offline-first sync engine for PMS mobile and web apps",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "pms",
+    "sync",
+    "offline",
+    "queue",
+    "mobile"
+  ],
+  "author": "Hotel PMS Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0"
+  },
+  "dependencies": {}
+}

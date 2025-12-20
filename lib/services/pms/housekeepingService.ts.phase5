@@ -1,0 +1,517 @@
+/**
+ * Housekeeping Service - Manage room cleaning and maintenance tasks
+ */
+
+import { prisma } from '@/lib/prisma'
+import { eventBus } from '@/lib/events/eventBus'
+import { HousekeepingTaskStatus, HousekeepingTaskPriority, RoomStatus } from '@prisma/client'
+
+export interface CreateTaskInput {
+  hotelId: string
+  roomId: string
+  date: Date
+  priority: HousekeepingTaskPriority
+  taskType: 'CHECKOUT_CLEANING' | 'STAYOVER' | 'TURNDOWN' | 'DEEP_CLEAN'
+  instructions?: string
+  assignedTo?: string
+}
+
+export interface UpdateTaskInput {
+  priority?: HousekeepingTaskPriority
+  status?: HousekeepingTaskStatus
+  assignedTo?: string
+  instructions?: string
+  issuesFound?: string
+  photoUrls?: string[]
+}
+
+/**
+ * Create housekeeping task
+ */
+export async function createTask(input: CreateTaskInput) {
+  const task = await prisma.housekeepingTask.create({
+    data: {
+      ...input,
+      status: 'PENDING'
+    },
+    include: {
+      room: {
+        include: {
+          roomType: true
+        }
+      }
+    }
+  })
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('housekeeping.taskCreated', {
+  //    taskId: task.id,
+  //    hotelId: task.hotelId,
+  //    roomId: task.roomId
+  //  })
+
+  return task
+}
+
+/**
+ * Assign task to housekeeper
+ */
+export async function assignTask(
+  taskId: string,
+  hotelId: string,
+  housekeeperId: string
+) {
+  const task = await prisma.housekeepingTask.update({
+    where: { id: taskId, hotelId },
+    data: {
+      assignedTo: housekeeperId,
+      assignedAt: new Date(),
+      status: 'ASSIGNED'
+    }
+  })
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('housekeeping.taskAssigned', {
+  //    taskId: task.id,
+  //    hotelId,
+  //    housekeeperId
+  //  })
+
+  return task
+}
+
+/**
+ * Start task
+ */
+export async function startTask(taskId: string, hotelId: string) {
+  const task = await prisma.housekeepingTask.update({
+    where: { id: taskId, hotelId },
+    data: {
+      status: 'IN_PROGRESS',
+      startedAt: new Date()
+    }
+  })
+
+  // Update room status to CLEANING
+  await prisma.room.update({
+    where: { id: task.roomId, hotelId },
+    data: {
+      status: 'CLEANING' as RoomStatus
+    }
+  })
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('housekeeping.taskStarted', {
+  //   taskId: task.id,
+  //   hotelId,
+  //   roomId: task.roomId
+  // })
+
+  return task
+}
+
+/**
+ * Complete task
+ */
+export async function completeTask(
+  taskId: string,
+  hotelId: string,
+  data: {
+    issuesFound?: string
+    photoUrls?: string[]
+    timeSpent?: number
+  }
+) {
+  const task = await prisma.housekeepingTask.update({
+    where: { id: taskId, hotelId },
+    data: {
+      status: 'COMPLETED',
+      completedAt: new Date(),
+      ...data
+    },
+    include: {
+      room: true
+    }
+  })
+
+  // Update room status to CLEAN (pending inspection)
+  await prisma.room.update({
+    where: { id: task.roomId, hotelId },
+    data: {
+      status: 'CLEAN' as RoomStatus,
+      lastCleanedAt: new Date()
+    }
+  })
+
+  // Update round progress if part of a round
+  if (task.roundId) {
+    const round = await prisma.housekeepingRound.findUnique({
+      where: { id: task.roundId },
+      include: {
+        tasks: true
+      }
+    })
+
+    if (round) {
+      const completedTasks = round.tasks.filter(t => t.status === 'COMPLETED').length
+      await prisma.housekeepingRound.update({
+        where: { id: round.id },
+        data: {
+          completedRooms: completedTasks
+        }
+      })
+    }
+  }
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('housekeeping.taskCompleted', {
+  //   taskId: task.id,
+  //   hotelId,
+  //   roomId: task.roomId
+  // })
+
+  return task
+}
+
+/**
+ * Inspect task
+ */
+export async function inspectTask(
+  taskId: string,
+  hotelId: string,
+  inspectorId: string,
+  passed: boolean,
+  notes?: string
+) {
+  const task = await prisma.housekeepingTask.update({
+    where: { id: taskId, hotelId },
+    data: {
+      status: passed ? 'APPROVED' : 'PENDING',
+      inspectedBy: inspectorId,
+      inspectedAt: new Date(),
+      inspectionNotes: notes,
+      passed
+    },
+    include: {
+      room: true
+    }
+  })
+
+  if (passed) {
+    // Mark room as available
+    await prisma.room.update({
+      where: { id: task.roomId, hotelId },
+      data: {
+        status: 'AVAILABLE' as RoomStatus,
+        lastInspectedAt: new Date()
+      }
+    })
+
+    // eventBus.emit('housekeeping.taskApproved', {
+    //   taskId: task.id,
+    //   hotelId,
+    //   roomId: task.roomId
+    // })
+  } else {
+    // Mark room as CLEAN (needs re-cleaning)
+    await prisma.room.update({
+      where: { id: task.roomId, hotelId },
+      data: {
+        status: 'CLEAN' as RoomStatus
+      }
+    })
+
+    // eventBus.emit('housekeeping.taskRejected', {
+    //   taskId: task.id,
+    //   hotelId,
+    //   roomId: task.roomId,
+    //   notes
+    // })
+  }
+
+  return task
+}
+
+/**
+ * Create housekeeping round
+ */
+export async function createRound(
+  hotelId: string,
+  name: string,
+  date: Date,
+  shiftType: string,
+  assignedTo: string[],
+  supervisor: string,
+  roomIds: string[]
+) {
+  const round = await prisma.housekeepingRound.create({
+    data: {
+      hotelId,
+      name,
+      date,
+      shiftType,
+      assignedTo,
+      supervisor,
+      status: 'ASSIGNED',
+      totalRooms: roomIds.length,
+      completedRooms: 0
+    }
+  })
+
+  // Create tasks for each room
+  for (const roomId of roomIds) {
+    await prisma.housekeepingTask.create({
+      data: {
+        hotelId,
+        roomId,
+        roundId: round.id,
+        date,
+        priority: 'MEDIUM',
+        status: 'ASSIGNED',
+        taskType: 'STAYOVER'
+      }
+    })
+  }
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('housekeeping.roundCreated', {
+  //   roundId: round.id,
+  //   hotelId,
+  //   roomCount: roomIds.length
+  // })
+
+  return round
+}
+
+/**
+ * Start round
+ */
+export async function startRound(roundId: string, hotelId: string) {
+  const round = await prisma.housekeepingRound.update({
+    where: { id: roundId, hotelId },
+    data: {
+      status: 'IN_PROGRESS',
+      startedAt: new Date()
+    }
+  })
+
+  return round
+}
+
+/**
+ * Complete round
+ */
+export async function completeRound(roundId: string, hotelId: string) {
+  const round = await prisma.housekeepingRound.update({
+    where: { id: roundId, hotelId },
+    data: {
+      status: 'COMPLETED',
+      completedAt: new Date()
+    }
+  })
+
+  return round
+}
+
+/**
+ * Get tasks by status
+ */
+export async function getTasksByStatus(
+  hotelId: string,
+  status: HousekeepingTaskStatus,
+  date?: Date
+) {
+  const where: any = { hotelId, status }
+
+  if (date) {
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    where.date = { gte: startOfDay, lte: endOfDay }
+  }
+
+  return prisma.housekeepingTask.findMany({
+    where,
+    include: {
+      room: {
+        include: {
+          roomType: true
+        }
+      }
+    },
+    orderBy: [
+      { priority: 'desc' },
+      { date: 'asc' }
+    ]
+  })
+}
+
+/**
+ * Get tasks assigned to housekeeper
+ */
+export async function getHousekeeperTasks(
+  hotelId: string,
+  housekeeperId: string,
+  date?: Date
+) {
+  const where: any = { hotelId, assignedTo: housekeeperId }
+
+  if (date) {
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    where.date = { gte: startOfDay, lte: endOfDay }
+  }
+
+  return prisma.housekeepingTask.findMany({
+    where,
+    include: {
+      room: {
+        include: {
+          roomType: true
+        }
+      }
+    },
+    orderBy: { priority: 'desc' }
+  })
+}
+
+/**
+ * Generate daily tasks automatically
+ */
+export async function generateDailyTasks(hotelId: string, date: Date) {
+  // Get all dirty rooms
+  const dirtyRooms = await prisma.room.findMany({
+    where: {
+      hotelId,
+      status: 'DIRTY'
+    }
+  })
+
+  // Get all occupied rooms for stayover service
+  const occupiedRooms = await prisma.room.findMany({
+    where: {
+      hotelId,
+      status: 'OCCUPIED'
+    }
+  })
+
+  const tasks = []
+
+  // Create checkout cleaning tasks
+  for (const room of dirtyRooms) {
+    const task = await createTask({
+      hotelId,
+      roomId: room.id,
+      date,
+      priority: 'HIGH',
+      taskType: 'CHECKOUT_CLEANING'
+    })
+    tasks.push(task)
+  }
+
+  // Create stayover tasks
+  for (const room of occupiedRooms) {
+    const task = await createTask({
+      hotelId,
+      roomId: room.id,
+      date,
+      priority: 'MEDIUM',
+      taskType: 'STAYOVER'
+    })
+    tasks.push(task)
+  }
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('housekeeping.dailyTasksGenerated', {
+  //   hotelId,
+  //   date,
+  //   taskCount: tasks.length
+  // })
+
+  return tasks
+}
+
+/**
+ * Get housekeeping statistics
+ */
+export async function getHousekeepingStats(hotelId: string, date: Date) {
+  const startOfDay = new Date(date)
+  startOfDay.setHours(0, 0, 0, 0)
+
+  const endOfDay = new Date(date)
+  endOfDay.setHours(23, 59, 59, 999)
+
+  const [
+    totalTasks,
+    pendingTasks,
+    inProgressTasks,
+    completedTasks,
+    approvedTasks,
+    dirtyRooms,
+    cleanRooms,
+    availableRooms
+  ] = await Promise.all([
+    prisma.housekeepingTask.count({
+      where: {
+        hotelId,
+        date: { gte: startOfDay, lte: endOfDay }
+      }
+    }),
+    prisma.housekeepingTask.count({
+      where: {
+        hotelId,
+        status: 'PENDING',
+        date: { gte: startOfDay, lte: endOfDay }
+      }
+    }),
+    prisma.housekeepingTask.count({
+      where: {
+        hotelId,
+        status: 'IN_PROGRESS',
+        date: { gte: startOfDay, lte: endOfDay }
+      }
+    }),
+    prisma.housekeepingTask.count({
+      where: {
+        hotelId,
+        status: 'COMPLETED',
+        date: { gte: startOfDay, lte: endOfDay }
+      }
+    }),
+    prisma.housekeepingTask.count({
+      where: {
+        hotelId,
+        status: 'APPROVED',
+        date: { gte: startOfDay, lte: endOfDay }
+      }
+    }),
+    prisma.room.count({
+      where: { hotelId, status: 'DIRTY' }
+    }),
+    prisma.room.count({
+      where: { hotelId, status: 'CLEAN' }
+    }),
+    prisma.room.count({
+      where: { hotelId, status: 'AVAILABLE' }
+    })
+  ])
+
+  return {
+    totalTasks,
+    pendingTasks,
+    inProgressTasks,
+    completedTasks,
+    approvedTasks,
+    completionRate: totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
+    dirtyRooms,
+    cleanRooms,
+    availableRooms
+  }
+}

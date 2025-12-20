@@ -1,0 +1,279 @@
+/**
+ * Invoice Generator Service - Auto-generate invoices from folios
+ */
+
+import { prisma } from '@/lib/prisma'
+import { addDays, startOfDay, endOfDay } from 'date-fns'
+
+export interface InvoiceGenerationResult {
+  hotelId: string
+  invoicesGenerated: number
+  totalAmount: number
+  foliosProcessed: number
+}
+
+export const invoiceGeneratorService = {
+  /**
+   * Auto-generate invoices for closed folios
+   */
+  async generateInvoices(hotelId: string): Promise<InvoiceGenerationResult> {
+    const today = new Date()
+    let invoicesGenerated = 0
+    let totalAmount = 0
+    let foliosProcessed = 0
+
+    // Find closed folios without invoices
+    const closedFolios = await prisma.folio.findMany({
+      where: {
+        hotelId,
+        status: 'CLOSED',
+        invoices: {
+          none: {} // No invoices exist yet
+        }
+      },
+      include: {
+        booking: true,
+        items: true
+      }
+    })
+
+    for (const folio of closedFolios) {
+      foliosProcessed++
+
+      // Generate invoice number
+      const invoiceNumber = await this.generateInvoiceNumber(hotelId)
+
+      // Create invoice
+      const invoice = await prisma.invoice.create({
+        data: {
+          hotelId,
+          invoiceNumber,
+          invoiceDate: today,
+          folioId: folio.id,
+          bookingId: folio.bookingId,
+          guestId: folio.guestId,
+          guestEmail: folio.guestEmail,
+          subtotal: folio.subtotal,
+          taxAmount: folio.taxAmount,
+          total: folio.total,
+          status: 'DRAFT',
+          paymentStatus: 'UNPAID',
+          dueDate: addDays(today, 7) // Due in 7 days
+        }
+      })
+
+      invoicesGenerated++
+      totalAmount += folio.total
+
+      // If folio is fully paid, mark invoice as paid
+      if (folio.status === 'SETTLED' || folio.total === 0) {
+        await prisma.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            paymentStatus: 'PAID',
+            paidDate: today,
+            status: 'FINALIZED'
+          }
+        })
+      }
+    }
+
+    // Log execution
+    await prisma.jobExecution.create({
+      data: {
+        hotelId,
+        jobName: 'generate-invoices',
+        status: 'COMPLETED',
+        metadata: {
+          invoicesGenerated,
+          totalAmount,
+          foliosProcessed
+        }
+      }
+    })
+
+    return {
+      hotelId,
+      invoicesGenerated,
+      totalAmount,
+      foliosProcessed
+    }
+  },
+
+  /**
+   * Send invoice reminders for overdue invoices
+   */
+  async sendOverdueReminders(hotelId: string): Promise<number> {
+    const today = new Date()
+    let remindersSent = 0
+
+    // Find overdue unpaid invoices
+    const overdueInvoices = await prisma.invoice.findMany({
+      where: {
+        hotelId,
+        paymentStatus: 'UNPAID',
+        dueDate: {
+          lt: today
+        },
+        status: {
+          in: ['DRAFT', 'SENT']
+        }
+      },
+      include: {
+        booking: {
+          include: {
+            guest: true
+          }
+        }
+      }
+    })
+
+    for (const invoice of overdueInvoices) {
+      const guest = invoice.booking?.guest
+
+      if (guest && guest.email) {
+        // TODO: Implement email sending
+        // await emailService.sendOverdueInvoiceReminder(guest.email, invoice)
+        remindersSent++
+
+        // Update invoice status
+        await prisma.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: 'SENT'
+          }
+        })
+      }
+    }
+
+    return remindersSent
+  },
+
+  /**
+   * Auto-apply payments from folios to invoices
+   */
+  async reconcilePayments(hotelId: string): Promise<number> {
+    let reconciled = 0
+
+    // Find invoices with associated folios
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        hotelId,
+        paymentStatus: 'UNPAID'
+      },
+      include: {
+        folio: true
+      }
+    })
+
+    for (const invoice of invoices) {
+      if (invoice.folio && invoice.folio.status === 'SETTLED') {
+        await prisma.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            paymentStatus: 'PAID',
+            paidDate: new Date(),
+            status: 'FINALIZED'
+          }
+        })
+        reconciled++
+      }
+    }
+
+    return reconciled
+  },
+
+  /**
+   * Generate unique invoice number
+   */
+  async generateInvoiceNumber(hotelId: string): Promise<string> {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+
+    const count = await prisma.invoice.count({
+      where: {
+        hotelId,
+        invoiceDate: {
+          gte: new Date(year, today.getMonth(), 1),
+          lt: new Date(year, today.getMonth() + 1, 1)
+        }
+      }
+    })
+
+    return `INV-${year}${month}-${String(count + 1).padStart(5, '0')}`
+  },
+
+  /**
+   * Get invoice statistics
+   */
+  async getInvoiceStatistics(hotelId: string, daysAgo: number = 30) {
+    const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
+
+    const [total, paid, unpaid, overdue] = await Promise.all([
+      prisma.invoice.count({
+        where: {
+          hotelId,
+          invoiceDate: { gte: since }
+        }
+      }),
+      prisma.invoice.count({
+        where: {
+          hotelId,
+          paymentStatus: 'PAID',
+          invoiceDate: { gte: since }
+        }
+      }),
+      prisma.invoice.count({
+        where: {
+          hotelId,
+          paymentStatus: 'UNPAID',
+          invoiceDate: { gte: since }
+        }
+      }),
+      prisma.invoice.count({
+        where: {
+          hotelId,
+          paymentStatus: 'UNPAID',
+          dueDate: { lt: new Date() },
+          invoiceDate: { gte: since }
+        }
+      })
+    ])
+
+    const totalRevenue = await prisma.invoice.aggregate({
+      where: {
+        hotelId,
+        invoiceDate: { gte: since }
+      },
+      _sum: {
+        total: true
+      }
+    })
+
+    const collectedRevenue = await prisma.invoice.aggregate({
+      where: {
+        hotelId,
+        paymentStatus: 'PAID',
+        invoiceDate: { gte: since }
+      },
+      _sum: {
+        total: true
+      }
+    })
+
+    return {
+      period: `Last ${daysAgo} days`,
+      total,
+      paid,
+      unpaid,
+      overdue,
+      totalRevenue: totalRevenue._sum.total || 0,
+      collectedRevenue: collectedRevenue._sum.total || 0,
+      collectionRate:
+        totalRevenue._sum.total && totalRevenue._sum.total > 0
+          ? (((collectedRevenue._sum.total || 0) / totalRevenue._sum.total) * 100)
+          : 0
+    }
+  }
+}

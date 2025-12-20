@@ -1,0 +1,476 @@
+/**
+ * Folio Service - Manage guest billing and charges
+ */
+
+import { prisma } from '@/lib/prisma'
+import { eventBus } from '@/lib/events/eventBus'
+
+export interface PostChargeInput {
+  folioId: string
+  hotelId: string
+  description: string
+  category: 'ROOM' | 'FOOD' | 'BEVERAGE' | 'LAUNDRY' | 'MINIBAR' | 'PHONE' | 'OTHER'
+  quantity: number
+  unitPrice: number
+  taxRate?: number
+  userId: string
+  notes?: string
+}
+
+/**
+ * Post charge to folio
+ */
+export async function postCharge(input: PostChargeInput) {
+  const { folioId, hotelId, taxRate = 0, userId, description, category, quantity, unitPrice } = input
+
+  const totalPrice = quantity * unitPrice
+  const taxAmount = totalPrice * (taxRate / 100)
+
+  const folioItem = await prisma.folioItem.create({
+    data: {
+      folioId,
+      description,
+      category,
+      quantity,
+      unitPrice,
+      totalPrice,
+      taxRate,
+      taxAmount,
+      postedBy: userId,
+      serviceDate: new Date(),
+      postedAt: new Date(),
+    }
+  })
+
+  // Update folio totals
+  await prisma.folio.update({
+    where: { id: folioId, hotelId },
+    data: {
+      subtotal: { increment: totalPrice },
+      taxAmount: { increment: taxAmount },
+      totalAmount: { increment: totalPrice + taxAmount },
+      balanceDue: { increment: totalPrice + taxAmount }
+    }
+  })
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('charge.posted', {
+  //   folioItemId: folioItem.id,
+  //   folioId,
+  //   hotelId,
+  //   amount: totalAmount,
+  //   category: chargeData.category
+  // })
+
+  return folioItem
+}
+
+/**
+ * Post multiple charges in batch
+ */
+export async function postBatchCharges(
+  folioId: string,
+  hotelId: string,
+  charges: Omit<PostChargeInput, 'folioId' | 'hotelId'>[],
+  userId: string
+) {
+  const results = []
+
+  for (const charge of charges) {
+    const item = await postCharge({
+      folioId,
+      hotelId,
+      ...charge,
+      userId
+    })
+    results.push(item)
+  }
+
+  return results
+}
+
+/**
+ * Void folio item
+ */
+export async function voidFolioItem(
+  folioItemId: string,
+  hotelId: string,
+  reason: string,
+  userId: string
+) {
+  const item = await prisma.folioItem.findFirst({
+    where: { id: folioItemId },
+    include: { folio: true }
+  })
+
+  if (!item || item.folio.hotelId !== hotelId) {
+    throw new Error('Folio item not found')
+  }
+
+  // Mark item as voided
+  await prisma.folioItem.update({
+    where: { id: folioItemId },
+    data: {
+      isVoided: true,
+      voidedAt: new Date(),
+      voidedBy: userId,
+      voidReason: reason
+    }
+  })
+
+  // Create reversal entry
+  const reversalAmount = item.totalPrice + item.taxAmount
+  await prisma.folioItem.create({
+    data: {
+      folioId: item.folioId,
+      description: `VOID: ${item.description} - ${reason}`,
+      category: item.category,
+      quantity: -item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: -item.totalPrice,
+      taxRate: item.taxRate,
+      taxAmount: -item.taxAmount,
+      postedBy: userId,
+      serviceDate: new Date(),
+      postedAt: new Date(),
+    }
+  })
+
+  // Update folio totals
+  const totalToReverse = item.totalPrice + item.taxAmount
+  await prisma.folio.update({
+    where: { id: item.folioId, hotelId },
+    data: {
+      subtotal: { decrement: item.totalPrice },
+      taxAmount: { decrement: item.taxAmount },
+      totalAmount: { decrement: totalToReverse },
+      balanceDue: { decrement: totalToReverse }
+    }
+  })
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('charge.voided', {
+  //   folioItemId: item.id,
+  //   folioId: item.folioId,
+  //   hotelId,
+  //   reason
+  // })
+
+  return item
+}
+
+/**
+ * Transfer charges to another folio
+ */
+export async function transferCharges(
+  fromFolioId: string,
+  toFolioId: string,
+  hotelId: string,
+  itemIds: string[],
+  userId: string
+) {
+  return prisma.$transaction(async (tx) => {
+    const items = await tx.folioItem.findMany({
+      where: {
+        id: { in: itemIds },
+        folioId: fromFolioId,
+        hotelId
+      }
+    })
+
+    if (items.length !== itemIds.length) {
+      throw new Error('Some items not found')
+    }
+
+    let totalAmount = 0
+    let totalTax = 0
+    let totalSubtotal = 0
+
+    // Create transfer entries in destination folio
+    for (const item of items) {
+      await tx.folioItem.create({
+        data: {
+          hotelId,
+          folioId: toFolioId,
+          date: new Date(),
+          description: `Transfer from Folio: ${item.description}`,
+          category: item.category,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: item.amount,
+          taxRate: item.taxRate,
+          taxAmount: item.taxAmount,
+          totalAmount: item.totalAmount,
+          postedBy: userId
+        }
+      })
+
+      // Create reversal in source folio
+      await tx.folioItem.create({
+        data: {
+          hotelId,
+          folioId: fromFolioId,
+          date: new Date(),
+          description: `Transfer to Folio: ${item.description}`,
+          category: item.category,
+          quantity: -item.quantity,
+          unitPrice: item.unitPrice,
+          amount: -item.amount,
+          taxRate: item.taxRate,
+          taxAmount: -item.taxAmount,
+          totalAmount: -item.totalAmount,
+          postedBy: userId
+        }
+      })
+
+      totalAmount += item.totalAmount
+      totalTax += item.taxAmount
+      totalSubtotal += item.amount
+    }
+
+    // Update source folio totals
+    await tx.folio.update({
+      where: { id: fromFolioId, hotelId },
+      data: {
+        subtotal: { decrement: totalSubtotal },
+        taxAmount: { decrement: totalTax },
+        total: { decrement: totalAmount }
+      }
+    })
+
+    // Update destination folio totals
+    await tx.folio.update({
+      where: { id: toFolioId, hotelId },
+      data: {
+        subtotal: { increment: totalSubtotal },
+        taxAmount: { increment: totalTax },
+        total: { increment: totalAmount }
+      }
+    })
+
+    return { itemsTransferred: items.length, totalAmount }
+  })
+}
+
+/**
+ * Split folio
+ */
+export async function splitFolio(
+  originalFolioId: string,
+  hotelId: string,
+  splitItems: { itemId: string; splitAmount: number }[],
+  newFolioName: string,
+  userId: string
+) {
+  return prisma.$transaction(async (tx) => {
+    const originalFolio = await tx.folio.findUnique({
+      where: { id: originalFolioId, hotelId }
+    })
+
+    if (!originalFolio) {
+      throw new Error('Original folio not found')
+    }
+
+    // Create new folio
+    const newFolio = await tx.folio.create({
+      data: {
+        hotelId,
+        bookingId: originalFolio.bookingId,
+        guestId: originalFolio.guestId,
+        folioNumber: `${originalFolio.folioNumber}-SPLIT`,
+        name: newFolioName,
+        type: originalFolio.type,
+        status: 'OPEN',
+        subtotal: 0,
+        taxAmount: 0,
+        total: 0
+      }
+    })
+
+    // Process split items
+    for (const split of splitItems) {
+      const item = await tx.folioItem.findUnique({
+        where: { id: split.itemId, hotelId }
+      })
+
+      if (!item) continue
+
+      // Calculate split proportions
+      const splitRatio = split.splitAmount / item.totalAmount
+      const splitTax = item.taxAmount * splitRatio
+      const splitSubtotal = item.amount * splitRatio
+
+      // Add to new folio
+      await tx.folioItem.create({
+        data: {
+          hotelId,
+          folioId: newFolio.id,
+          date: new Date(),
+          description: `Split: ${item.description}`,
+          category: item.category,
+          quantity: item.quantity * splitRatio,
+          unitPrice: item.unitPrice,
+          amount: splitSubtotal,
+          taxRate: item.taxRate,
+          taxAmount: splitTax,
+          totalAmount: split.splitAmount,
+          postedBy: userId
+        }
+      })
+
+      // Reduce in original folio
+      const remainingAmount = item.totalAmount - split.splitAmount
+      const remainingTax = item.taxAmount - splitTax
+      const remainingSubtotal = item.amount - splitSubtotal
+
+      await tx.folioItem.create({
+        data: {
+          hotelId,
+          folioId: originalFolioId,
+          date: new Date(),
+          description: `Split adjustment: ${item.description}`,
+          category: item.category,
+          quantity: -item.quantity * splitRatio,
+          unitPrice: item.unitPrice,
+          amount: -splitSubtotal,
+          taxRate: item.taxRate,
+          taxAmount: -splitTax,
+          totalAmount: -split.splitAmount,
+          postedBy: userId
+        }
+      })
+    }
+
+    // Recalculate folio totals
+    const [originalItems, newItems] = await Promise.all([
+      tx.folioItem.findMany({ where: { folioId: originalFolioId } }),
+      tx.folioItem.findMany({ where: { folioId: newFolio.id } })
+    ])
+
+    const originalTotal = originalItems.reduce((sum, item) => sum + item.totalAmount, 0)
+    const originalTax = originalItems.reduce((sum, item) => sum + item.taxAmount, 0)
+    const originalSubtotal = originalItems.reduce((sum, item) => sum + item.amount, 0)
+
+    const newTotal = newItems.reduce((sum, item) => sum + item.totalAmount, 0)
+    const newTax = newItems.reduce((sum, item) => sum + item.taxAmount, 0)
+    const newSubtotal = newItems.reduce((sum, item) => sum + item.amount, 0)
+
+    await tx.folio.update({
+      where: { id: originalFolioId },
+      data: {
+        subtotal: originalSubtotal,
+        taxAmount: originalTax,
+        total: originalTotal
+      }
+    })
+
+    await tx.folio.update({
+      where: { id: newFolio.id },
+      data: {
+        subtotal: newSubtotal,
+        taxAmount: newTax,
+        total: newTotal
+      }
+    })
+
+    return { originalFolio: originalFolioId, newFolio: newFolio.id }
+  })
+}
+
+/**
+ * Get folio with all items
+ */
+export async function getFolio(folioId: string, hotelId: string) {
+  return prisma.folio.findUnique({
+    where: { id: folioId, hotelId },
+    include: {
+      booking: {
+        include: {
+          guest: true,
+          room: true
+        }
+      },
+      items: {
+        orderBy: { date: 'asc' }
+      },
+      invoices: {
+        include: {
+          payments: true
+        }
+      }
+    }
+  })
+}
+
+/**
+ * Get all folios for booking
+ */
+export async function getBookingFolios(bookingId: string, hotelId: string) {
+  return prisma.folio.findMany({
+    where: { bookingId, hotelId },
+    include: {
+      items: {
+        orderBy: { date: 'asc' }
+      }
+    },
+    orderBy: { createdAt: 'asc' }
+  })
+}
+
+/**
+ * Close folio
+ */
+export async function closeFolio(folioId: string, hotelId: string) {
+  const folio = await prisma.folio.update({
+    where: { id: folioId, hotelId },
+    data: { status: 'CLOSED' }
+  })
+
+  // TODO: Add PMS event types in Phase 6
+  // eventBus.emit('folio.closed', {
+  //   folioId,
+  //   hotelId,
+  //   total: folio.total
+  // })
+
+  return folio
+}
+
+/**
+ * Get folio summary
+ */
+export async function getFolioSummary(folioId: string, hotelId: string) {
+  const folio = await prisma.folio.findUnique({
+    where: { id: folioId, hotelId },
+    include: {
+      items: true,
+      booking: {
+        include: {
+          guest: true
+        }
+      }
+    }
+  })
+
+  if (!folio) {
+    throw new Error('Folio not found')
+  }
+
+  // Group charges by category
+  const chargesByCategory = folio.items.reduce((acc, item) => {
+    const category = item.category
+    if (!acc[category]) {
+      acc[category] = { count: 0, total: 0 }
+    }
+    acc[category].count += 1
+    acc[category].total += item.totalAmount
+    return acc
+  }, {} as Record<string, { count: number; total: number }>)
+
+  return {
+    folio,
+    chargesByCategory,
+    totalCharges: folio.items.length,
+    balance: folio.total
+  }
+}

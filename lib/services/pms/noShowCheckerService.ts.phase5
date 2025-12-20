@@ -1,0 +1,197 @@
+/**
+ * No-Show Checker Service - Check for no-show bookings and handle penalties
+ */
+
+import { prisma } from '@/lib/prisma'
+import { subHours, startOfDay, differenceInHours } from 'date-fns'
+
+export interface NoShowCheckResult {
+  hotelId: string
+  noShowsDetected: number
+  penaltiesApplied: number
+  roomsFreed: number
+}
+
+export const noShowCheckerService = {
+  /**
+   * Check for no-show bookings and apply penalties
+   */
+  async checkAndProcessNoShows(hotelId: string): Promise<NoShowCheckResult> {
+    const now = new Date()
+    const checkInCutoff = subHours(now, 2) // Bookings with check-in time over 2 hours ago
+
+    // Find bookings that should have checked in but haven't
+    const noShowBookings = await prisma.booking.findMany({
+      where: {
+        hotelId,
+        checkInDate: {
+          lte: now
+        },
+        status: 'CONFIRMED', // Still confirmed, not checked in
+        checkInTime: null, // No check-in recorded
+        createdAt: {
+          lt: checkInCutoff
+        }
+      },
+      include: {
+        guest: true,
+        room: true,
+        folios: true
+      }
+    })
+
+    let noShowsDetected = 0
+    let penaltiesApplied = 0
+    let roomsFreed = 0
+
+    for (const booking of noShowBookings) {
+      noShowsDetected++
+
+      // Mark booking as no-show
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'NO_SHOW',
+          notes: `Auto-flagged as no-show on ${now.toISOString()}`
+        }
+      })
+
+      // Apply cancellation fee to folio if exists
+      if (booking.folios.length > 0) {
+        const folio = booking.folios[0]
+        const cancellationFee = booking.totalAmount * 0.5 // 50% of booking amount
+
+        await prisma.folio.update({
+          where: { id: folio.id },
+          data: {
+            subtotal: {
+              increment: cancellationFee
+            },
+            total: {
+              increment: cancellationFee
+            }
+          }
+        })
+
+        await prisma.folioItem.create({
+          data: {
+            folioId: folio.id,
+            category: 'PENALTY',
+            description: 'No-show cancellation fee',
+            quantity: 1,
+            unitPrice: cancellationFee,
+            taxRate: 0,
+            taxAmount: 0,
+            totalAmount: cancellationFee,
+            postedBy: 'SYSTEM'
+          }
+        })
+
+        penaltiesApplied++
+      }
+
+      // Free up the room if assigned
+      if (booking.roomId) {
+        await prisma.room.update({
+          where: { id: booking.roomId },
+          data: {
+            status: 'CLEAN'
+          }
+        })
+        roomsFreed++
+      }
+
+      // Deduct loyalty points if applicable
+      if (booking.guest) {
+        await prisma.guest.update({
+          where: { id: booking.guest.id },
+          data: {
+            loyaltyPoints: {
+              decrement: 50 // Penalize with points
+            }
+          }
+        })
+      }
+    }
+
+    // Log execution
+    await prisma.jobExecution.create({
+      data: {
+        hotelId,
+        jobName: 'check-no-shows',
+        status: 'COMPLETED',
+        metadata: {
+          noShowsDetected,
+          penaltiesApplied,
+          roomsFreed
+        }
+      }
+    })
+
+    return {
+      hotelId,
+      noShowsDetected,
+      penaltiesApplied,
+      roomsFreed
+    }
+  },
+
+  /**
+   * Get no-show statistics for a period
+   */
+  async getNoShowStatistics(hotelId: string, daysAgo: number = 30) {
+    const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
+
+    const noShows = await prisma.booking.findMany({
+      where: {
+        hotelId,
+        status: 'NO_SHOW',
+        updatedAt: {
+          gte: since
+        }
+      }
+    })
+
+    const totalBookings = await prisma.booking.count({
+      where: {
+        hotelId,
+        createdAt: {
+          gte: since
+        }
+      }
+    })
+
+    return {
+      period: `Last ${daysAgo} days`,
+      noShowCount: noShows.length,
+      totalBookings,
+      noShowRate: totalBookings > 0 ? (noShows.length / totalBookings) * 100 : 0,
+      totalFeesCollected: noShows.reduce((sum, b) => sum + (b.totalAmount * 0.5), 0)
+    }
+  },
+
+  /**
+   * Get upcoming check-ins at risk of no-show
+   */
+  async getAtRiskCheckIns(hotelId: string, hoursUntilCheckIn: number = 4) {
+    const now = new Date()
+    const cutoff = new Date(now.getTime() + hoursUntilCheckIn * 60 * 60 * 1000)
+
+    return prisma.booking.findMany({
+      where: {
+        hotelId,
+        checkInDate: {
+          gte: now,
+          lte: cutoff
+        },
+        status: 'CONFIRMED',
+        checkInTime: null
+      },
+      include: {
+        guest: true,
+        room: true
+      },
+      orderBy: { checkInDate: 'asc' }
+    })
+  }
+}

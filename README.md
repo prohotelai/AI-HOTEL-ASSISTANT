@@ -12,6 +12,9 @@ A comprehensive multi-tenant SaaS platform offering AI-powered conversational ag
 - **Modern UI**: Tailwind CSS with responsive design
 - **Ready for AI**: Structured for OpenAI and Pinecone integration
 - **Billing Ready**: Prepared for Stripe integration
+- **Knowledge Base Ingestion**: Tenant-scoped sources, documents, and embedding queues
+- **RAG Chat Orchestration**: Retrieval-augmented GPT responses with tool scaffolding
+- **AI Widget SDK**: Drop-in browser bundle with chat, voice, localization, and telemetry
 
 ## 🛠️ Tech Stack
 
@@ -24,16 +27,8 @@ A comprehensive multi-tenant SaaS platform offering AI-powered conversational ag
 
 ## 📋 Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
-- Neon account (or any PostgreSQL database)
-
-## 🔧 Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/prohotelai/AI-HOTEL-ASSISTANT.git
-cd AI-HOTEL-ASSISTANT
 ```
 
 2. Install dependencies:
@@ -62,7 +57,6 @@ npm run db:generate
 ```bash
 npm run db:push
 ```
-
 ## 🚀 Running the Application
 
 ### Development Mode
@@ -102,7 +96,11 @@ ai-hotel-assistant/
 ├── lib/
 │   ├── auth.ts              # NextAuth configuration
 │   ├── prisma.ts            # Prisma client
-│   └── utils.ts             # Utility functions
+│   ├── utils.ts             # Utility functions
+│   ├── ai/                  # AI retrieval & OpenAI utilities
+│   ├── knowledgeBase/       # Document chunking utilities
+│   ├── queues/              # BullMQ queues (tickets, knowledge base)
+│   └── services/            # Domain services (tickets, knowledge base)
 ├── prisma/
 │   └── schema.prisma        # Database schema
 └── types/                   # TypeScript type definitions
@@ -139,6 +137,48 @@ The app uses NextAuth.js with credentials provider. Users can:
 - Customizable branding per hotel
 - Anonymous guest support
 - Floating chat button
+
+## 🧩 AI Widget SDK (Module 6)
+- Built as a standalone package in `widget-sdk/` with Vite library mode.
+- Emits ESM, UMD, and IIFE bundles so hotels can load it via bundlers or a plain `<script>` tag.
+- Provides chat, optional voice capture/playback (browser Speech APIs), localization (EN/ES/FR built-in), theming tokens, event tracking, and permission-aware actions.
+- Build and test commands:
+
+```bash
+npm run widget:build
+npm run widget:test
+```
+
+- Minimal integration example:
+
+```html
+<script src="/path/to/widget-sdk.iife.js"></script>
+<script>
+	const widget = window.ProHotelAIWidget.createWidget({
+		hotelId: 'hotel_123',
+		apiBaseUrl: 'https://app.yourhotel.com',
+		defaultLanguage: 'en',
+		enableVoice: true,
+		permissions: ['tickets:create'],
+		theme: { accentColor: '#f97316' }
+	})
+
+	widget.on('message:received', ({ content }) => {
+		console.log('Assistant replied:', content)
+	})
+</script>
+```
+
+- For module consumers using ESM:
+
+```ts
+import { createWidget } from '@prohotelai/widget-sdk'
+
+const widget = createWidget({
+	hotelId: 'hotel_123',
+	apiBaseUrl: 'https://app.yourhotel.com'
+})
+```
 
 ## 🔌 API Endpoints
 
@@ -187,6 +227,8 @@ The codebase is prepared for:
 - `npm run db:push` - Push schema to database
 - `npm run db:migrate` - Create migration
 - `npm run db:studio` - Open Prisma Studio
+- `npm run widget:build` - Build the standalone widget bundles
+- `npm run widget:test` - Run widget package unit tests
 
 ## 🔒 Environment Variables
 
@@ -197,6 +239,8 @@ Required:
 
 Optional (for future use):
 - `OPENAI_API_KEY` - OpenAI API key
+- `OPENAI_MODEL` - Override default chat model (defaults to gpt-4o-mini)
+- `OPENAI_BASE_URL` - Alternate OpenAI-compatible endpoint
 - `PINECONE_API_KEY` - Pinecone API key
 - `PINECONE_ENVIRONMENT` - Pinecone environment
 - `PINECONE_INDEX` - Pinecone index name

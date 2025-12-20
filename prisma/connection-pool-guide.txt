@@ -1,0 +1,25 @@
+// Prisma Connection Pool Configuration
+// Add to your DATABASE_URL or as separate configuration
+
+// Format: postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public&connection_limit=10&pool_timeout=10
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Recommended production connection string format:
+// postgresql://user:password@host:5432/database?schema=public&connection_limit=10&pool_timeout=10&connect_timeout=20
+
+// Connection pool settings (add to DATABASE_URL query params):
+// - connection_limit: Maximum number of connections (default: 10 for production)
+// - pool_timeout: Max time to wait for connection from pool in seconds (default: 10)
+// - connect_timeout: Max time to wait for database connection in seconds (default: 20)
+
+// Example production DATABASE_URL:
+// postgresql://myuser:mypassword@db.example.com:5432/ai_hotel_assistant?schema=public&connection_limit=10&pool_timeout=10&connect_timeout=20

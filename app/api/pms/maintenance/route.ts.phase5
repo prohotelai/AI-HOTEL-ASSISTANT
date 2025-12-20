@@ -1,0 +1,87 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { maintenanceService } from '@/lib/services/pms/maintenanceService'
+import { z } from 'zod'
+import { withPermission } from '@/lib/middleware/rbac'
+import { Permission } from '@/lib/rbac'
+
+const createWorkOrderSchema = z.object({
+  title: z.string().min(1),
+  description: z.string(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'EMERGENCY']),
+  category: z.string(),
+  roomId: z.string().optional(),
+  equipmentId: z.string().optional(),
+  assignedToId: z.string().optional(),
+  dueDate: z.string().transform(str => new Date(str)).optional(),
+  estimatedCost: z.number().min(0).optional()
+})
+
+// GET /api/pms/maintenance - List work orders
+export const GET = withPermission(Permission.ADMIN_VIEW)(async (request: NextRequest) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status') || undefined
+    const priority = searchParams.get('priority') || undefined
+    const category = searchParams.get('category') || undefined
+    const assignedToId = searchParams.get('assignedToId') || undefined
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const offset = parseInt(searchParams.get('offset') || '0')
+
+    const { workOrders, total } = await maintenanceService.getWorkOrders(
+      user.hotelId,
+      {
+        status,
+        priority,
+        category,
+        assignedToId,
+        limit,
+        offset
+      }
+    )
+
+    return NextResponse.json({ workOrders, total })
+  } catch (error: any) {
+    console.error('Error fetching work orders:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch work orders' },
+      { status: 500 }
+    )
+  }
+})
+
+// POST /api/pms/maintenance - Create work order
+export const POST = withPermission(Permission.ADMIN_MANAGE)(async (request: NextRequest) => {
+  try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+
+    const body = await request.json()
+    const data = createWorkOrderSchema.parse(body)
+
+    const workOrder = await maintenanceService.createWorkOrder({
+      hotelId: user.hotelId,
+      ...data
+    })
+
+    return NextResponse.json(workOrder, { status: 201 })
+  } catch (error: any) {
+    console.error('Error creating work order:', error)
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.issues },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create work order' },
+      { status: 500 }
+    )
+  }
+})

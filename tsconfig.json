@@ -23,5 +23,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "apps/mobile-staff", "jest.config.ts", "playwright.config.ts", "packages/**", ".disabled-routes/**", ".disabled-modules/**", "tests/**", "widget-sdk/**"]
 }

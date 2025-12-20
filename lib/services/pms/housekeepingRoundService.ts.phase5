@@ -1,0 +1,220 @@
+/**
+ * Housekeeping Round Service - Daily housekeeping assignment scheduler
+ */
+
+import { prisma } from '@/lib/prisma'
+import { HousekeepingTaskPriority, HousekeepingTaskStatus } from '@prisma/client'
+import { addDays, startOfDay } from 'date-fns'
+
+export interface HousekeepingRound {
+  hotelId: string
+  date: Date
+  tasksCreated: number
+  tasksAssigned: number
+  priority: HousekeepingTaskPriority
+}
+
+export const housekeepingRoundService = {
+  /**
+   * Execute daily housekeeping round for a hotel
+   * Creates cleaning tasks for all occupied/inspected rooms
+   */
+  async executeDailyRound(hotelId: string): Promise<HousekeepingRound> {
+    const today = startOfDay(new Date())
+    let tasksCreated = 0
+    let tasksAssigned = 0
+
+    // Find all rooms that need housekeeping attention
+    const roomsNeedingCleaning = await prisma.room.findMany({
+      where: {
+        hotelId,
+        status: {
+          in: ['DIRTY', 'OCCUPIED']
+        }
+      },
+      include: {
+        bookings: {
+          where: {
+            checkOutDate: {
+              lte: addDays(today, 1)
+            }
+          },
+          orderBy: { checkOutDate: 'desc' },
+          take: 1
+        }
+      }
+    })
+
+    // Create housekeeping tasks
+    for (const room of roomsNeedingCleaning) {
+      // Determine priority based on room status
+      const isCheckout = room.bookings.length > 0
+      const priority: HousekeepingTaskPriority = isCheckout ? 'HIGH' : 'NORMAL'
+
+      const task = await prisma.housekeepingTask.create({
+        data: {
+          hotelId,
+          roomId: room.id,
+          taskType: isCheckout ? 'TURNOVER' : 'SPOT_CLEAN',
+          scheduledFor: today,
+          priority,
+          status: 'PENDING',
+          notes: isCheckout
+            ? 'Complete room turnover after guest checkout'
+            : 'Spot cleaning and minor maintenance'
+        }
+      })
+
+      tasksCreated++
+
+      // Try to auto-assign to available staff
+      const availableStaff = await prisma.staff.findFirst({
+        where: {
+          hotelId,
+          department: 'HOUSEKEEPING',
+          status: 'ACTIVE'
+        },
+        include: {
+          housekeepingTasks: {
+            where: {
+              date: today,
+              status: {
+                in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS']
+              }
+            }
+          }
+        },
+        orderBy: {
+          housekeepingTasks: {
+            _count: 'asc'
+          }
+        }
+      })
+
+      if (availableStaff) {
+        await prisma.housekeepingTask.update({
+          where: { id: task.id },
+          data: {
+            assignedTo: availableStaff.id,
+            status: 'ASSIGNED'
+          }
+        })
+        tasksAssigned++
+      }
+    }
+
+    // Log the round execution
+    const round: HousekeepingRound = {
+      hotelId,
+      date: today,
+      tasksCreated,
+      tasksAssigned,
+      priority: 'NORMAL'
+    }
+
+    // Store execution record
+    await prisma.jobExecution.create({
+      data: {
+        hotelId,
+        jobName: 'daily-housekeeping-round',
+        status: 'COMPLETED',
+        metadata: round
+      }
+    })
+
+    return round
+  },
+
+  /**
+   * Get pending housekeeping tasks for a staff member
+   */
+  async getStaffPendingTasks(staffId: string, date?: Date) {
+    const whereDate = date ? startOfDay(date) : startOfDay(new Date())
+
+    return prisma.housekeepingTask.findMany({
+      where: {
+        assignedTo: staffId,
+        date: {
+          gte: whereDate,
+          lt: addDays(whereDate, 1)
+        },
+        status: {
+          in: ['ASSIGNED', 'IN_PROGRESS']
+        }
+      },
+      include: {
+        room: {
+          include: {
+            roomType: true
+          }
+        }
+      },
+      orderBy: { priority: 'desc' }
+    })
+  },
+
+  /**
+   * Get housekeeping round statistics
+   */
+  async getRoundStatistics(hotelId: string, date?: Date) {
+    const whereDate = date ? startOfDay(date) : startOfDay(new Date())
+
+    const [total, pending, assigned, completed, failed] = await Promise.all([
+      prisma.housekeepingTask.count({
+        where: { hotelId, date: whereDate }
+      }),
+      prisma.housekeepingTask.count({
+        where: { hotelId, date: whereDate, status: 'PENDING' }
+      }),
+      prisma.housekeepingTask.count({
+        where: { hotelId, date: whereDate, status: 'ASSIGNED' }
+      }),
+      prisma.housekeepingTask.count({
+        where: { hotelId, date: whereDate, status: 'COMPLETED' }
+      }),
+      prisma.housekeepingTask.count({
+        where: { hotelId, date: whereDate, status: 'FAILED_INSPECTION' }
+      })
+    ])
+
+    return {
+      date: whereDate,
+      total,
+      pending,
+      assigned,
+      completed,
+      failed,
+      completionRate: total > 0 ? (completed / total) * 100 : 0
+    }
+  },
+
+  /**
+   * Escalate overdue tasks
+   */
+  async escalateOverdueTasks(hotelId: string) {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+
+    const overdueTasks = await prisma.housekeepingTask.findMany({
+      where: {
+        hotelId,
+        status: 'IN_PROGRESS',
+        createdAt: {
+          lt: twoHoursAgo
+        }
+      }
+    })
+
+    let escalated = 0
+    for (const task of overdueTasks) {
+      await prisma.housekeepingTask.update({
+        where: { id: task.id },
+        data: {
+          priority: 'URGENT'
+        }
+      })
+      escalated++
+    }
+
+    return escalated
+  }
+}
