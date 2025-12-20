@@ -1,9 +1,8 @@
-'use client'
-
-import LandingPageClient from '@/components/marketing/LandingPageClient'
+import MarketingClientPage from './page.client'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default function MarketingPage() {
-  return <LandingPageClient />
+  return <MarketingClientPage />
 }
