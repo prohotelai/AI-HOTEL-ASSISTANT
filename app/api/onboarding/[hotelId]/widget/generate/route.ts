@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Widget Key Generation API
  * POST /api/onboarding/[hotelId]/widget/generate

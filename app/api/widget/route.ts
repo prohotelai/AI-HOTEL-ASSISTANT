@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Widget API Routes
  * POST /api/widget/session - Create widget session for guest

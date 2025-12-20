@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Mobile Tasks API Routes
  * GET /api/mobile/tasks - Get tasks for staff

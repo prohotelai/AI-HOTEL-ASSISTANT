@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Mobile Rooms API Routes
  * GET /api/mobile/rooms - Get all rooms for hotel

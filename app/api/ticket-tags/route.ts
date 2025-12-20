@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { withPermission } from '@/lib/middleware/rbac'
 import { Permission } from '@/lib/rbac'

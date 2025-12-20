@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Onboarding Activation API
  * POST /api/onboarding/[hotelId]/activate

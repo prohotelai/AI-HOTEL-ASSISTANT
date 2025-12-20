@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * External PMS Connection API
  * Admin endpoints for connecting and managing external PMS integrations

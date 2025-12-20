@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Onboarding Analytics API
  * GET /api/onboarding/[hotelId]/analytics

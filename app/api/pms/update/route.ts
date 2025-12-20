@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // ============================================================================
 // SESSION 5.6 - PMS UPDATE ENDPOINT
 // File: app/api/pms/update/route.ts

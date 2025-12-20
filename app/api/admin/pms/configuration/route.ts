@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * External PMS Configuration API
  * Save and retrieve PMS configurations

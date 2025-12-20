@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Mobile Auth API Routes
  * POST /api/mobile/auth/login - Email/password login

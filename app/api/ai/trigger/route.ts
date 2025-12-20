@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // ============================================================================
 // SESSION 5.6 - AI TRIGGER & AUTOMATION ENGINE
 // File: app/api/ai/trigger/route.ts

@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * AI Modules Status API Endpoint
  * Returns available AI modules and their status

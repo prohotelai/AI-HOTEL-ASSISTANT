@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // ============================================================================
 // SESSION 5.6 - QR SCAN & VALIDATION WORKFLOW
 // File: app/api/qr/scan/route.ts

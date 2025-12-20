@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * POST /api/qr/tokens/[tokenId]/regenerate
  * Regenerate a QR token (revoke old, create new)

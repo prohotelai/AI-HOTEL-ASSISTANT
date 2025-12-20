@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // ============================================================================
 // SESSION 5.6 - ADMIN DASHBOARD BACKEND ROUTES
 // File: app/api/admin/route.ts

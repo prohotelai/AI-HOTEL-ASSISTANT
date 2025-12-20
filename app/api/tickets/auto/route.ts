@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // ============================================================================
 // SESSION 5.6 - TICKETS AUTO-CREATION ENDPOINT
 // File: app/api/tickets/auto/route.ts

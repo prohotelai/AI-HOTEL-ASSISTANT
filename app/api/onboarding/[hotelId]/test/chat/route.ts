@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * Test Chat API for Onboarding
  * POST /api/onboarding/[hotelId]/test/chat

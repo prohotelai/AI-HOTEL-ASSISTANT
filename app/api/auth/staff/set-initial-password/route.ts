@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * API - تعيين كلمة المرور الأولية للموظف
  * Staff Initial Password Setup API
