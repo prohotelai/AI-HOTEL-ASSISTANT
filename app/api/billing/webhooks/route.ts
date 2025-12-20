@@ -3,14 +3,23 @@ import { headers } from 'next/headers'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-11-17.clover',
-})
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-
 export async function POST(req: NextRequest) {
   try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+    if (!stripeSecretKey || !webhookSecret) {
+      console.error('Missing Stripe environment variables')
+      return NextResponse.json(
+        { error: 'Webhook not configured' },
+        { status: 503 }
+      )
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-11-17.clover',
+    })
+
     const body = await req.text()
     const signature = headers().get('stripe-signature')!
 
