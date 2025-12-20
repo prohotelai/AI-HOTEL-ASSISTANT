@@ -157,13 +157,13 @@ export function KnowledgeBaseClient({
 
   const pushParams = (params: URLSearchParams) => {
     startTransition(() => {
-      router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname)
+      router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname || '/')
     })
   }
 
   const handleStatusChange = (value: StatusFilterKey) => {
     setStatusFilter(value)
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     if (value === 'all') {
       params.delete('status')
     } else {
@@ -175,7 +175,7 @@ export function KnowledgeBaseClient({
 
   const handleCategoryChange = (value: string) => {
     setCategoryFilter(value)
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     if (!value || value === 'all') {
       params.delete('category')
     } else {
@@ -187,7 +187,7 @@ export function KnowledgeBaseClient({
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     if (searchTerm.trim().length) {
       params.set('q', searchTerm.trim())
     } else {
@@ -201,7 +201,7 @@ export function KnowledgeBaseClient({
     setStatusFilter('all')
     setCategoryFilter('all')
     setSearchTerm('')
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     params.delete('status')
     params.delete('category')
     params.delete('q')
@@ -211,7 +211,7 @@ export function KnowledgeBaseClient({
 
   const handleLoadMore = () => {
     if (!nextCursor) return
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams?.toString() || '')
     params.set('cursor', nextCursor)
     pushParams(params)
   }

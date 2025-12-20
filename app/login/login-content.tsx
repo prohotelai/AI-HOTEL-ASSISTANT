@@ -7,7 +7,7 @@ import Link from 'next/link'
 export default function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const token = searchParams.get('token')
+  const token = searchParams?.get('token')
 
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(false)

@@ -28,7 +28,7 @@ export default function SupportPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const params = useParams()
-  const workspaceId = params.workspaceId as string
+  const workspaceId = params?.workspaceId as string
 
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
