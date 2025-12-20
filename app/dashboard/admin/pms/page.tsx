@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState } from 'react'
 import { JobStatusBadge, JobExecutionCard, JobMonitoringList, JobStatistics, JobTriggerButton } from '@/components/pms/JobMonitoring'
 import { MetricCard, StatusSummary, DataTable, Alert } from '@/components/pms/DashboardComponents'

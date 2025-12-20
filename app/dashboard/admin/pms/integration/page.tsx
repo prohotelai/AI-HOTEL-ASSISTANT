@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * PMS Integration Dashboard
  * View and manage external PMS connections
