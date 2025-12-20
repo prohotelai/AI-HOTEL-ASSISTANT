@@ -6,6 +6,7 @@
 - **Singletons**: [lib/prisma.ts](lib/prisma.ts) (connection pool), [lib/env.ts](lib/env.ts) (typed env + validation), [lib/auth.ts](lib/auth.ts) (NextAuth + JWT).
 - **Middleware**: [middleware.ts](middleware.ts) enforces auth + hotel boundaries. **Update when protecting new routes.**
 - **Type Aliases**: Use relative imports (`@/lib/...`); `hotelId` always extracted from auth, never from request body.
+- **Widget SDK**: Standalone package in [widget-sdk](widget-sdk) built with Vite library mode → ESM/UMD/IIFE bundles for `<script>` tag embeds.
 
 ## Tenant Security (Critical – Read First)
 - **Always extract hotelId from auth**: `getServerSession()` or `withAuth()` extracts from NextAuth JWT, not from request body.
@@ -14,18 +15,27 @@
   - Enforce at **every Prisma query**: `where: { hotelId }` prevents cross-tenant data leaks.
 - **API Handler Pattern**: `withAuth()` wrapper → validate request → check permission → call service → return DTO (never expose secrets).
   - Wrap route handlers: `export const POST = withAuth(async (req, ctx) => { ... })` with `AuthContext = { userId, hotelId, role }`.
+  - Location: [lib/auth/withAuth.ts](lib/auth/withAuth.ts) exports `withAuth` and `AuthContext` type.
 - **RBAC**: [lib/rbac.ts](lib/rbac.ts) defines Permission enum (`TICKETS_CREATE`, `PMS_BOOKINGS_READ`). Check via `permissionsForRole(role)` or `hasPermission(role, perm)`.
+- **Session Validation**: [middleware.ts](middleware.ts) validates JWT tokens on protected routes, checks suspension status, enforces hotel boundaries before routing.
 
 ## AI & Chat Pipeline
 **Entry**: [app/api/chat/route.ts](app/api/chat/route.ts) accepts `{ message, conversationId, hotelId, guestId }`.
 - **Flow**: (1) Check message usage limits via [lib/subscription/usageTracking.ts](lib/subscription/usageTracking.ts), (2) retrieve knowledge via [lib/ai/retrieval.ts](lib/ai/retrieval.ts) (Pinecone + keyword fallback), (3) call OpenAI [lib/ai/openai.ts](lib/ai/openai.ts), (4) route tool calls via [lib/ai/tools.ts](lib/ai/tools.ts).
 - **Tools**: Defined in [lib/ai/tools.ts](lib/ai/tools.ts) with `toolDefinitions` array. Execute via `executeToolCall()` which validates permissions before action.
+  - Example: `create_ticket` tool checks `Permission.TICKETS_CREATE` before calling `createTicket()` service.
+  - Pass `ToolExecutionContext { hotelId, userId, permissions }` to every tool call.
 - **Limits**: Usage tracked per hotel per month (resets monthly). Throw `UsageLimitError` if exceeded; emit `usage.limit.exceeded` event.
 - **Knowledge Base**: Ingest via [lib/services/knowledgeBaseService.ts](lib/services/knowledgeBaseService.ts) → embeddings → Pinecone. Graceful fallback if Pinecone unavailable.
+- **AI Module Structure**: [lib/ai](lib/ai) contains `aiAccessLayer.ts` (service facade), `embeddings.ts`, `vectorProvider.ts`, `workflow-engine.ts`, plus domain-specific folders: `events/`, `guards/`, `models/`, `read-models/`, `services/`, `triggers/`.
 
 ## Events & Jobs
 - **Event Bus**: In-process [lib/events/eventBus.ts](lib/events/eventBus.ts) (EventEmitter). **All payloads must include `hotelId`.**
+  - Event types defined in `AppEventMap`: `tickets.created`, `knowledgeBase.document.ingested`, `pms.booking.synced`, etc.
+  - Pattern: Service emits → listener enqueues job → worker processes async.
 - **Queues**: BullMQ in [lib/queues](lib/queues) (Redis-backed). Job types: KB embedding, ticket SLA, PMS sync.
+  - [ticketQueues.ts](lib/queues/ticketQueues.ts) - `scheduleAiSummaryJob()`, `scheduleSlaAutomation()`
+  - [knowledgeBaseQueue.ts](lib/queues/knowledgeBaseQueue.ts) - Document chunking + embedding jobs
 - **Pattern**: Service emits on state change (e.g., `eventBus.emit('tickets.created', { ticketId, hotelId })`). Listeners enqueue jobs; workers process async.
 - **PMS Sync**: [lib/services/pmsService.ts](lib/services/pmsService.ts) reads `ExternalPMSConfig` model; adapter pattern via [lib/ai/read-models](lib/ai/read-models) (Opera, Mews, etc.).
 
@@ -42,8 +52,10 @@
 **Dev Mode**: `npm run dev` → Next.js on `:3000`, Prisma Studio: `npm run db:studio`.
 - **Database**: `npm run db:push` (sync schema), `npm run db:migrate` (Neon), `npm run db:seed` (load test data).
 - **Build & Test**: `npm run build` (local), `npm run vercel-build` (CI), `npm test` (Vitest).
+- **Widget SDK**: `npm run widget:build` (Vite library build), `npm run widget:test` (widget tests).
 - **Scripts**: [scripts](scripts) folder—`validate-deployment.ts`, `load-assistant-docs.ts`, billing workflow tests.
-- **Pre-Deploy Check**: `npx ts-node scripts/validate-deployment.ts` validates env, Redis, Postgres, Pinecone connectivity.
+  - Pre-Deploy Check: `npx ts-node scripts/validate-deployment.ts` validates env, Redis, Postgres, Pinecone connectivity.
+  - KB Loading: `npm run assistant:load-docs` ingests docs into knowledge base.
 
 ## Testing Patterns
 - **Unit/Integration**: Vitest in [tests](tests) mirroring structure. Config: [vitest.config.ts](vitest.config.ts).

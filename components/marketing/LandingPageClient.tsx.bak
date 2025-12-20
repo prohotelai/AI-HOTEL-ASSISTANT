@@ -22,10 +22,10 @@ import {
   Phone,
   MapPin
 } from 'lucide-react'
-import Container from '@/components/marketing/Container'
-import Section from '@/components/marketing/Section'
-import FeatureCard from '@/components/marketing/FeatureCard'
-import PricingCard from '@/components/marketing/PricingCard'
+import { Container } from '@/components/marketing/Container'
+import { Section } from '@/components/marketing/Section'
+import { FeatureCard } from '@/components/marketing/FeatureCard'
+import { PricingCard } from '@/components/marketing/PricingCard'
 import { motion } from 'framer-motion'
 
 type BenefitCard = {
@@ -50,6 +50,8 @@ type PricingPlan = {
   price: string
   description: string
   features: string[]
+  cta: string
+  ctaLink: string
   highlighted?: boolean
 }
 
@@ -104,7 +106,7 @@ const features = [
   {
     icon: Brain,
     title: 'AI Training Layer',
-    description: 'Customize AI behavior based on your property\'s unique requirements and guest preferences.'
+    description: "Customize AI behavior based on your property's unique requirements and guest preferences."
   },
   {
     icon: Users,
@@ -119,7 +121,7 @@ const features = [
   {
     icon: Lock,
     title: 'Role-Based Permissions & White-label',
-    description: 'Granular access control with customizable branding to match your hotel\'s identity.'
+    description: "Granular access control with customizable branding to match your hotel's identity."
   },
   {
     icon: BarChart3,
@@ -167,7 +169,9 @@ const pricingPlans: PricingPlan[] = [
       '1 GB storage',
       'Basic knowledge base',
       'Email support'
-    ]
+    ],
+    cta: 'Start Free',
+    ctaLink: '/register'
   },
   {
     name: 'Pro',
@@ -181,6 +185,8 @@ const pricingPlans: PricingPlan[] = [
       '24/7 support',
       'PMS integration'
     ],
+    cta: 'Get Started',
+    ctaLink: '/register',
     highlighted: true
   },
   {
@@ -194,14 +200,17 @@ const pricingPlans: PricingPlan[] = [
       '25 GB storage',
       'Priority support',
       'Advanced analytics'
-    ]
+    ],
+    cta: 'Get Started',
+    ctaLink: '/register'
   }
 ]
 
 export function LandingPageClient() {
   return (
     <div>
-      <Section background="white" className="pt-20 pb-16 md:pt-24 md:pb-20">
+      {/* SECTION 1: HERO */}
+      <Section background="default" className="pt-20 pb-16 md:pt-24 md:pb-20">
         <Container>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <motion.div
@@ -267,6 +276,7 @@ export function LandingPageClient() {
         </Container>
       </Section>
 
+      {/* SECTION 2 - KEY BENEFITS */}
       <Section background="white">
         <Container>
           <div className="text-center mb-12 md:mb-16">
@@ -301,7 +311,8 @@ export function LandingPageClient() {
         </Container>
       </Section>
 
-      <Section background="gray">
+      {/* SECTION 3 - CORE FEATURES */}
+      <Section background="muted">
         <Container>
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-brand-text mb-4 tracking-tight">
@@ -319,13 +330,14 @@ export function LandingPageClient() {
                 icon={feature.icon}
                 title={feature.title}
                 description={feature.description}
-                index={index}
+                delay={index * 0.05}
               />
             ))}
           </div>
         </Container>
       </Section>
 
+      {/* SECTION 4 - HOW IT WORKS */}
       <Section background="white">
         <Container>
           <div className="text-center mb-16">
@@ -359,7 +371,8 @@ export function LandingPageClient() {
         </Container>
       </Section>
 
-      <Section background="gray">
+      {/* SECTION 5 - PRICING PREVIEW */}
+      <Section background="muted">
         <Container>
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-brand-text mb-4 tracking-tight">
@@ -378,10 +391,8 @@ export function LandingPageClient() {
                 price={plan.price}
                 description={plan.description}
                 features={plan.features}
-                highlighted={plan.highlighted}
-                cta="Get Started"
-                ctaLink="/register"
-                index={index}
+                isPopular={plan.highlighted}
+                delay={index * 0.1}
               />
             ))}
           </div>
@@ -398,27 +409,28 @@ export function LandingPageClient() {
         </Container>
       </Section>
 
+      {/* SECTION 6 - CONTACT / CTA */}
       <Section background="white" className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/5 to-white opacity-50" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-white opacity-50"></div>
         <Container className="relative">
           <div id="contact" className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <motion.div
+            <AnimatedDiv
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: '-50px' }}
+              viewport={{ once: true }}
               transition={{ duration: 0.6 }}
             >
-              <h2 className="text-3xl md:text-4xl font-semibold text-brand-text mb-6 tracking-tight">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
                 Ready to Transform Your Hotel?
               </h2>
-              <p className="text-lg text-brand-muted mb-8">
+              <p className="text-lg text-gray-600 mb-8">
                 Contact us today to schedule a demo or get answers to your questions. Our team is here to help you succeed.
               </p>
 
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-6 h-6 text-brand-primary" aria-hidden="true" />
+                    <MapPin className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-brand-text mb-1">PROINVEST GLOBAL LTD</h3>
@@ -432,11 +444,11 @@ export function LandingPageClient() {
 
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Phone className="w-6 h-6 text-brand-primary" aria-hidden="true" />
+                    <Phone className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-brand-text mb-1">Phone</h3>
-                    <a href="tel:+447448810068" className="text-brand-primary hover:text-brand-primary-dark transition-colors">
+                    <a href="tel:+447448810068" className="text-brand-primary hover:text-brand-primary-dark">
                       +44 7448 810068
                     </a>
                   </div>
@@ -444,11 +456,11 @@ export function LandingPageClient() {
 
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Mail className="w-6 h-6 text-brand-primary" aria-hidden="true" />
+                    <Mail className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-brand-text mb-1">Email</h3>
-                    <a href="mailto:support@aihotelassistant.com" className="text-brand-primary hover:text-brand-primary-dark transition-colors">
+                    <a href="mailto:support@aihotelassistant.com" className="text-brand-primary hover:text-brand-primary-dark">
                       support@aihotelassistant.com
                     </a>
                   </div>
@@ -459,7 +471,7 @@ export function LandingPageClient() {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: '-50px' }}
+              viewport={{ once: true }}
               transition={{ duration: 0.6 }}
               className="bg-white rounded-2xl shadow-xl p-8 border border-brand-border"
             >
@@ -474,7 +486,6 @@ export function LandingPageClient() {
                     id="name"
                     className="w-full px-4 py-3 rounded-xl border border-brand-border focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
                     placeholder="John Doe"
-                    aria-label="Full Name"
                   />
                 </div>
                 <div>
@@ -486,7 +497,6 @@ export function LandingPageClient() {
                     id="email"
                     className="w-full px-4 py-3 rounded-xl border border-brand-border focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
                     placeholder="john@hotel.com"
-                    aria-label="Email Address"
                   />
                 </div>
                 <div>
@@ -498,7 +508,6 @@ export function LandingPageClient() {
                     id="hotel"
                     className="w-full px-4 py-3 rounded-xl border border-brand-border focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
                     placeholder="Grand Hotel"
-                    aria-label="Hotel Name"
                   />
                 </div>
                 <div>
@@ -510,12 +519,11 @@ export function LandingPageClient() {
                     rows={4}
                     className="w-full px-4 py-3 rounded-xl border border-brand-border focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all resize-none"
                     placeholder="Tell us about your hotel and requirements..."
-                    aria-label="Message"
-                  />
+                  ></textarea>
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-brand-primary text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-primary-dark transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+                  className="w-full bg-brand-primary text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-primary-dark transition-all duration-300 shadow-md hover:shadow-lg"
                 >
                   Send Message
                 </button>

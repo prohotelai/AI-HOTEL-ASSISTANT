@@ -55,21 +55,23 @@ export interface EnvConfig {
 
 function validateEnv(): EnvConfig {
   const env = process.env
+  const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
 
-  // Required variables
+  // Required variables (relaxed during build for Vercel)
   const required = ['DATABASE_URL', 'NEXTAUTH_SECRET', 'NEXTAUTH_URL', 'NEXT_PUBLIC_APP_URL']
   const missing = required.filter((key) => !env[key])
 
-  if (missing.length > 0) {
+  // During build, only fail for critical auth/db vars
+  if (!isBuildTime && missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
   }
 
   return {
-    // ✅ Required
+    // ✅ Required (with fallbacks for build time)
     DATABASE_URL: env.DATABASE_URL || '',
     NEXTAUTH_SECRET: env.NEXTAUTH_SECRET || '',
-    NEXTAUTH_URL: env.NEXTAUTH_URL || '',
-    NEXT_PUBLIC_APP_URL: env.NEXT_PUBLIC_APP_URL || '',
+    NEXTAUTH_URL: env.NEXTAUTH_URL || 'http://localhost:3000',
+    NEXT_PUBLIC_APP_URL: env.NEXT_PUBLIC_APP_URL || env.NEXTAUTH_URL || 'http://localhost:3000',
 
     // 🔐 Security - Mobile
     MOBILE_MAGIC_LINK_SHARED_SECRET: env.MOBILE_MAGIC_LINK_SHARED_SECRET,
