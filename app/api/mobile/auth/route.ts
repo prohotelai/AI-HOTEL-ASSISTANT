@@ -16,12 +16,13 @@ import { sign, verify } from 'jsonwebtoken'
 import { getEnv } from '@/lib/env'
 import { applyRateLimit } from '@/lib/middleware/rateLimit'
 import { createMagicLinkToken, consumeMagicLinkToken } from '@/lib/services/mobile/magicLinkService'
+import { SystemRole } from '@prisma/client'
 
 const { NEXTAUTH_SECRET: JWT_SECRET, MOBILE_MAGIC_LINK_SHARED_SECRET } = getEnv()
 const PASSWORD_JWT_EXPIRY = '7d'
 const MAGIC_LINK_JWT_EXPIRY = '30m'
 
-const MOBILE_AUTH_ALLOWED_ROLES = ['STAFF', 'ADMIN', 'MANAGER']
+const MOBILE_AUTH_ALLOWED_ROLES: SystemRole[] = [SystemRole.STAFF, SystemRole.MANAGER, SystemRole.OWNER]
 const MAGIC_LINK_SECRET_HEADERS = ['x-mobile-auth-secret', 'x-mobile-magic-link-secret']
 
 interface LoginRequest {

@@ -49,6 +49,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    if (!qrToken.role) {
+      return NextResponse.json(
+        { error: 'QR code role not specified' },
+        { status: 400 }
+      )
+    }
+
     // Parse metadata for context data
     const metadata = qrToken.metadata ? JSON.parse(qrToken.metadata as string) : {}
     

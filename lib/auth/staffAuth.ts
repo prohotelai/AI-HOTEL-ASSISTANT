@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { SystemRole } from '@prisma/client'
 
 /**
  * توليد معرف موظف جديد من قبل الأدمن
@@ -13,7 +14,7 @@ export async function generateStaffId(
   staffData: {
     name: string
     email: string
-    role: 'owner' | 'manager' | 'reception' | 'staff'
+    role: SystemRole
     hotelId: string
     department?: string
   },
@@ -38,11 +39,13 @@ export async function generateStaffId(
     }
 
     // توليد معرف موظف فريد
-    const rolePrefix = {
-      owner: 'OWN',
-      manager: 'MGR',
-      reception: 'REC',
-      staff: 'STF'
+    const rolePrefix: Record<SystemRole, string> = {
+      [SystemRole.OWNER]: 'OWN',
+      [SystemRole.MANAGER]: 'MGR',
+      [SystemRole.RECEPTION]: 'REC',
+      [SystemRole.STAFF]: 'STF',
+      [SystemRole.GUEST]: 'GST',
+      [SystemRole.AI_AGENT]: 'AI'
     }
 
     const prefix = rolePrefix[staffData.role]
@@ -361,7 +364,7 @@ export async function getStaffList(
       where: {
         hotelId,
         role: {
-          in: ['owner', 'manager', 'reception', 'staff']
+          in: [SystemRole.OWNER, SystemRole.MANAGER, SystemRole.RECEPTION, SystemRole.STAFF]
         }
       },
       orderBy: {

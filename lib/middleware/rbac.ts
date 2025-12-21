@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Permission } from '@/lib/rbac'
+import { SystemRole } from '@prisma/client'
 
 /**
  * التحقق من صلاحية المستخدم
@@ -47,7 +48,7 @@ export async function hasPermission(
     }
 
     // المالك لديه جميع الصلاحيات
-    if (user.role === 'owner') {
+    if (user.role === SystemRole.OWNER) {
       return true
     }
 
@@ -325,7 +326,7 @@ export async function getCurrentUserPermissions(userId: string, hotelId: string)
     }
 
     // المالك لديه جميع الصلاحيات
-    if (user.role === 'owner') {
+    if (user.role === SystemRole.OWNER) {
       return Object.values(Permission)
     }
 

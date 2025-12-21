@@ -7,7 +7,7 @@
  * - Users without hotelId → onboardingCompleted = false (needs onboarding)
  */
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, SystemRole } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -27,10 +27,10 @@ async function main() {
 
   console.log(`✅ Updated ${usersWithHotel.count} users with hotels to onboardingCompleted = true`)
 
-  // Update users with role 'admin' to 'OWNER' if they own/manage a hotel
+  // Update users with role 'OWNER' if they own/manage a hotel
   const adminUsers = await prisma.user.findMany({
     where: {
-      role: 'admin',
+      role: SystemRole.OWNER,
       hotelId: { not: null },
     },
     select: {
@@ -46,7 +46,7 @@ async function main() {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        role: 'OWNER',
+        role: SystemRole.OWNER,
         onboardingCompleted: true,
       }
     })

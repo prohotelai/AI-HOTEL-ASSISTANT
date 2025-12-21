@@ -76,8 +76,9 @@ export async function POST(req: NextRequest) {
       })
 
       if (booking?.guest) {
-        guestInfo.name = booking.guest.name || guestInfo.name
-        guestInfo.passportId = booking.guest.passportNumber || guestInfo.passportId
+        const guestFullName = [booking.guest.firstName, booking.guest.lastName].filter(Boolean).join(' ')
+        guestInfo.name = guestFullName || guestInfo.name
+        guestInfo.passportId = booking.guest.idNumber || guestInfo.passportId
       }
     }
 

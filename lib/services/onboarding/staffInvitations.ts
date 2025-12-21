@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { hashToken } from '@/lib/security/tokenUtils'
+import { SystemRole } from '@prisma/client'
 
 interface InvitationData {
   email: string
@@ -149,6 +150,15 @@ export async function acceptInvitation(
     // Hash password
     const hashedPassword = await bcrypt.hash(userData.password, 10)
 
+    // Map invitation role to SystemRole
+    const roleMap: Record<string, SystemRole> = {
+      'manager': SystemRole.MANAGER,
+      'reception': SystemRole.RECEPTION,
+      'staff': SystemRole.STAFF,
+      'housekeeping': SystemRole.STAFF,
+      'maintenance': SystemRole.STAFF
+    }
+
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -156,7 +166,7 @@ export async function acceptInvitation(
         name: userData.name,
         password: hashedPassword,
         hotelId: invite.hotelId,
-        role: invite.role,
+        role: roleMap[invite.role] || SystemRole.STAFF,
       },
     })
 

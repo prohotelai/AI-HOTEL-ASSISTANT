@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Scanner, AlertCircle } from 'lucide-react'
+import { QrCode, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function StaffAccessPage() {
@@ -80,7 +80,7 @@ export default function StaffAccessPage() {
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 rounded-full mb-4">
-            <Scanner className="w-10 h-10 text-indigo-600" />
+            <QrCode className="w-10 h-10 text-indigo-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Staff Access</h1>
           <p className="text-gray-600">Scan your staff QR code to access the system</p>
