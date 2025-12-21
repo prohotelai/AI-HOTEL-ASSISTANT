@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { User, Key, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export default function GuestIdentifyPage() {
+function GuestIdentifyContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [identifyMethod, setIdentifyMethod] = useState<'room' | 'passport'>('room')
@@ -185,5 +185,20 @@ export default function GuestIdentifyPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function GuestIdentifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <GuestIdentifyContent />
+    </Suspense>
   )
 }
