@@ -13,6 +13,7 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
+    hotelName: '',
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -117,6 +118,22 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 className="mt-1"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="hotelName" className="block text-sm font-medium text-gray-700">
+                Hotel Name
+              </label>
+              <Input
+                id="hotelName"
+                name="hotelName"
+                type="text"
+                required
+                value={formData.hotelName}
+                onChange={handleChange}
+                className="mt-1"
+                placeholder="e.g., Grand Plaza Hotel"
               />
             </div>
           </div>

@@ -16,11 +16,12 @@ interface ProfileStepProps {
 }
 
 export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepProps) {
-  const { data: session, update } = useSession()
+  const { data: session } = useSession()
   const hotelId = (session?.user as any)?.hotelId as string | null
+  const hotelName = (session?.user as any)?.hotel?.name as string | null
 
   const [formData, setFormData] = useState({
-    name: '',
+    name: hotelName || '',
     address: '',
     city: '',
     country: '',
@@ -38,60 +39,24 @@ export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepP
     setError('')
 
     try {
-      // If user doesn't have a hotel yet, create a DRAFT hotel
       if (!hotelId) {
-        // Create hotel slug from name
-        const slug = formData.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '')
+        throw new Error('No hotel found. Please contact support.')
+      }
 
-        const createRes = await fetch('/api/onboarding/create-hotel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            hotelName: formData.name,
-            slug,
-            status: 'DRAFT' // Create as DRAFT, will be activated at finish step
-          }),
-        })
+      // Update hotel profile with additional details
+      const res = await fetch(`/api/hotels/${hotelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: formData.address,
+          phone: formData.phone,
+          email: formData.email,
+          website: formData.website,
+        }),
+      })
 
-        if (!createRes.ok) {
-          const data = await createRes.json()
-          throw new Error(data.error || 'Failed to create hotel')
-        }
-
-        const { hotel } = await createRes.json()
-        
-        // Now update the hotel profile with additional details
-        const updateRes = await fetch(`/api/hotels/${hotel.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            address: formData.address,
-            phone: formData.phone,
-            email: formData.email,
-            website: formData.website,
-          }),
-        })
-
-        if (!updateRes.ok) {
-          throw new Error('Failed to update hotel profile')
-        }
-
-        // Update session
-        await update()
-      } else {
-        // Update existing hotel profile
-        const res = await fetch(`/api/hotels/${hotelId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        })
-
-        if (!res.ok) {
-          throw new Error('Failed to update hotel profile')
-        }
+      if (!res.ok) {
+        throw new Error('Failed to update hotel profile')
       }
 
       onComplete()
@@ -136,16 +101,18 @@ export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepP
 
           <div>
             <label className="block text-sm font-medium text-brand-text mb-2">
-              Hotel Name *
+              Hotel Name
             </label>
             <input
               type="text"
-              required
+              disabled
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2 border border-brand-border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-              placeholder="Grand Plaza Hotel"
+              className="w-full px-4 py-2 border border-brand-border rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              placeholder="Your hotel name"
             />
+            <p className="text-xs text-brand-muted mt-1">
+              Hotel name cannot be changed after registration
+            </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -279,7 +246,7 @@ export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepP
           </button>
           <button
             type="submit"
-            disabled={saving || !formData.name}
+            disabled={saving}
             className="px-8 py-3 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving...' : 'Continue →'}
