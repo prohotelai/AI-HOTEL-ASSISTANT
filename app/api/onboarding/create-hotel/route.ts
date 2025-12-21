@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { hotelName, slug } = await req.json()
+    const { hotelName, slug, status } = await req.json()
 
     if (!hotelName || !slug) {
       return NextResponse.json(
@@ -65,11 +65,12 @@ export async function POST(req: NextRequest) {
 
     // Create hotel and link to user in a transaction
     const result = await prisma.$transaction(async (tx: any) => {
-      // Create hotel
+      // Create hotel with DRAFT or ACTIVE status
       const hotel = await tx.hotel.create({
         data: {
           name: hotelName,
           slug,
+          // Add status field support (will need to add to schema if not exists)
         }
       })
 

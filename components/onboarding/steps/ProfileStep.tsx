@@ -16,8 +16,8 @@ interface ProfileStepProps {
 }
 
 export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepProps) {
-  const { data: session } = useSession()
-  const hotelId = session?.user?.hotelId as string
+  const { data: session, update } = useSession()
+  const hotelId = (session?.user as any)?.hotelId as string | null
 
   const [formData, setFormData] = useState({
     name: '',
@@ -30,25 +30,75 @@ export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepP
     timezone: 'America/New_York',
   })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setError('')
 
     try {
-      // Update hotel profile
-      const res = await fetch(`/api/hotels/${hotelId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
+      // If user doesn't have a hotel yet, create a DRAFT hotel
+      if (!hotelId) {
+        // Create hotel slug from name
+        const slug = formData.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
 
-      if (res.ok) {
-        onComplete()
-        onNext()
+        const createRes = await fetch('/api/onboarding/create-hotel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            hotelName: formData.name,
+            slug,
+            status: 'DRAFT' // Create as DRAFT, will be activated at finish step
+          }),
+        })
+
+        if (!createRes.ok) {
+          const data = await createRes.json()
+          throw new Error(data.error || 'Failed to create hotel')
+        }
+
+        const { hotel } = await createRes.json()
+        
+        // Now update the hotel profile with additional details
+        const updateRes = await fetch(`/api/hotels/${hotel.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: formData.address,
+            phone: formData.phone,
+            email: formData.email,
+            website: formData.website,
+          }),
+        })
+
+        if (!updateRes.ok) {
+          throw new Error('Failed to update hotel profile')
+        }
+
+        // Update session
+        await update()
+      } else {
+        // Update existing hotel profile
+        const res = await fetch(`/api/hotels/${hotelId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to update hotel profile')
+        }
       }
-    } catch (error) {
+
+      onComplete()
+      onNext()
+    } catch (error: any) {
       console.error('Failed to save profile:', error)
+      setError(error.message || 'Failed to save profile. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -68,6 +118,12 @@ export default function ProfileStep({ onComplete, onNext, onBack }: ProfileStepP
           This information helps personalize your AI assistant&apos;s responses
         </p>
       </div>
+
+      {error && (
+        <div className="mb-6 rounded-md bg-red-50 p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-brand-border space-y-4">

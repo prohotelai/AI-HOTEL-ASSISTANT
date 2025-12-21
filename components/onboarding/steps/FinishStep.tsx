@@ -8,35 +8,49 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, Sparkles, ArrowRight, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 
 interface FinishStepProps {
-  hotelId: string
+  onComplete: () => void
 }
 
-export default function FinishStep({ hotelId }: FinishStepProps) {
+export default function FinishStep({ onComplete }: FinishStepProps) {
   const router = useRouter()
+  const { data: session, update } = useSession()
+  const hotelId = (session?.user as any)?.hotelId as string
   const [activating, setActivating] = useState(false)
 
   async function handleActivate() {
     setActivating(true)
 
     try {
-      // Mark onboarding as complete
-      const res = await fetch(`/api/onboarding/${hotelId}/progress`, {
+      if (!hotelId) {
+        throw new Error('No hotel context found')
+      }
+
+      // Mark onboarding as complete and activate hotel
+      const res = await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          completedStep: 'finish',
-          isCompleted: true,
+          hotelId,
         }),
       })
 
-      if (res.ok) {
-        // Redirect to dashboard
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 1500)
+      if (!res.ok) {
+        throw new Error('Failed to complete onboarding')
       }
+
+      // Update session
+      await update()
+      
+      onComplete()
+
+      // Redirect to dashboard
+      setTimeout(() => {
+        router.push('/dashboard')
+        router.refresh()
+      }, 1500)
     } catch (error) {
       console.error('Failed to activate:', error)
     } finally {
