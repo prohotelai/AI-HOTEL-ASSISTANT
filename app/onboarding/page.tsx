@@ -33,6 +33,9 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome')
   const [completedSteps, setCompletedSteps] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Get hotelId from session (may be null initially)
+  const hotelId = (session?.user as any)?.hotelId as string | null
 
   useEffect(() => {
     if (status === 'loading') return
@@ -137,43 +140,49 @@ export default function OnboardingPage() {
           onBack={handleBack}
         />
       )}
-      {currentStep === 'website-scan' && (
+      {currentStep === 'website-scan' && hotelId && (
         <WebsiteScanStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('website-scan')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'knowledge-base' && (
+      {currentStep === 'knowledge-base' && hotelId && (
         <KnowledgeBaseStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('knowledge-base')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'widget' && (
+      {currentStep === 'widget' && hotelId && (
         <WidgetStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('widget')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'integrations' && (
+      {currentStep === 'integrations' && hotelId && (
         <IntegrationsStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('integrations')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'invite-staff' && (
+      {currentStep === 'invite-staff' && hotelId && (
         <InviteStaffStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('invite-staff')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'test' && (
+      {currentStep === 'test' && hotelId && (
         <TestChatStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('test')}
           onNext={handleNext}
           onBack={handleBack}
