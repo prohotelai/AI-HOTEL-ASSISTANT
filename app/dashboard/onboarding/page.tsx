@@ -203,7 +203,7 @@ export default function OnboardingWizard() {
           />
         )
       case 'finish':
-        return <FinishStep hotelId={hotelId} />
+        return <FinishStep onComplete={() => handleStepComplete('finish')} />
       default:
         return <WelcomeStep onComplete={() => handleStepComplete('welcome')} onNext={() => handleStepChange('profile')} />
     }
