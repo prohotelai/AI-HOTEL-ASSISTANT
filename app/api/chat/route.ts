@@ -9,6 +9,7 @@ import { createChatCompletion, ChatMessage } from '@/lib/ai/openai'
 import { toolDefinitions, executeToolCall } from '@/lib/ai/tools'
 import { eventBus } from '@/lib/events/eventBus'
 import { withAuth, AuthContext } from '@/lib/auth/withAuth'
+import { validateStaffSession, validateGuestSession } from '@/lib/auth/sessionValidation'
 import {
   checkAIMessageLimit,
   incrementAIMessageUsage,
@@ -17,8 +18,99 @@ import {
 
 const MAX_HISTORY = 12
 
+/**
+ * Chat context interface - required before AI can respond
+ */
+interface ChatContext {
+  role: 'ADMIN' | 'STAFF' | 'GUEST'
+  hotelId: string
+  userId?: string
+  staffId?: string
+  guestId?: string
+  roomId?: string
+  conversationId?: string
+}
+
+/**
+ * Extract chat context from request
+ * CRITICAL: AI chat requires valid context before processing
+ */
+async function extractChatContext(req: NextRequest): Promise<ChatContext | null> {
+  // Check for Bearer token (staff/guest sessions)
+  const authHeader = req.headers.get('authorization')
+  const sessionToken = authHeader?.replace('Bearer ', '')
+
+  if (sessionToken) {
+    // Try staff session
+    const staffSession = await validateStaffSession(sessionToken)
+    if (staffSession) {
+      return {
+        role: 'STAFF',
+        hotelId: staffSession.hotelId,
+        staffId: staffSession.userId,
+        userId: staffSession.userId,
+      }
+    }
+
+    // Try guest session
+    const guestSession = await validateGuestSession(sessionToken)
+    if (guestSession) {
+      return {
+        role: 'GUEST',
+        hotelId: guestSession.hotelId,
+        guestId: guestSession.id,
+        roomId: guestSession.guestRoomNumber || undefined,
+        conversationId: guestSession.conversationId || undefined,
+      }
+    }
+  }
+
+  // Fallback: Check NextAuth session (admin)
+  // This will be handled by withAuth wrapper
+  return null
+}
+
 async function handleChat(req: NextRequest, ctx: AuthContext) {
   try {
+    // ===== CONTEXT GATING (CRITICAL) =====
+    // Extract role context before processing AI request
+    let chatContext = await extractChatContext(req)
+    
+    // If no session context, use admin context from withAuth
+    if (!chatContext && ctx.userId) {
+      chatContext = {
+        role: 'ADMIN',
+        hotelId: ctx.hotelId,
+        userId: ctx.userId,
+      }
+    }
+
+    // BLOCK: AI chat requires valid context
+    if (!chatContext || !chatContext.hotelId) {
+      return NextResponse.json(
+        { 
+          error: 'AI chat requires valid context',
+          message: 'Unable to determine role and hotel. Please log in again.' 
+        },
+        { status: 403 }
+      )
+    }
+
+    // Validate role-specific requirements
+    if (chatContext.role === 'STAFF' && !chatContext.staffId) {
+      return NextResponse.json(
+        { error: 'Staff context requires staffId' },
+        { status: 403 }
+      )
+    }
+
+    if (chatContext.role === 'GUEST' && !chatContext.guestId) {
+      return NextResponse.json(
+        { error: 'Guest context requires identification' },
+        { status: 403 }
+      )
+    }
+
     const body = await req.json()
     const { message, conversationId, hotelId, guestId } = body
 
@@ -27,7 +119,7 @@ async function handleChat(req: NextRequest, ctx: AuthContext) {
     }
 
     // Enforce hotel scoping - users can only chat for their own hotel
-    if (hotelId !== ctx.hotelId) {
+    if (hotelId !== chatContext.hotelId) {
       return NextResponse.json({ error: 'Forbidden - Hotel access denied' }, { status: 403 })
     }
 

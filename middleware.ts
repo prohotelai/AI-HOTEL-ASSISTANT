@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { validateStaffSession, validateGuestSession } from '@/lib/auth/sessionValidation'
 
 /**
  * Enhanced Next.js Middleware for Session Management and RBAC
  * 
  * Features:
- * - NextAuth JWT token validation
+ * - NextAuth JWT token validation (Admin)
+ * - Staff session validation (StaffSession)
+ * - Guest session validation (GuestSession)
  * - Session expiration checking
  * - Role-based access control (RBAC)
  * - Hotel boundary enforcement
@@ -16,11 +19,70 @@ import { getToken } from 'next-auth/jwt'
  */
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // ===== STAFF ROUTE PROTECTION =====
+  if (pathname.startsWith('/staff') && 
+      !pathname.startsWith('/staff/access') && 
+      !pathname.startsWith('/staff/password')) {
+    
+    const authHeader = request.headers.get('authorization')
+    const sessionToken = authHeader?.replace('Bearer ', '') || 
+                        request.cookies.get('staff-session')?.value
+
+    if (!sessionToken) {
+      return NextResponse.redirect(new URL('/staff/access', request.url))
+    }
+
+    const staffSession = await validateStaffSession(sessionToken)
+    
+    if (!staffSession) {
+      return NextResponse.redirect(new URL('/staff/access?expired=true', request.url))
+    }
+
+    // Add session data to headers for downstream use
+    const response = NextResponse.next()
+    response.headers.set('x-staff-id', staffSession.userId)
+    response.headers.set('x-hotel-id', staffSession.hotelId)
+    response.headers.set('x-session-type', 'STAFF')
+    
+    return addSecurityHeaders(response, request)
+  }
+
+  // ===== GUEST ROUTE PROTECTION =====
+  if (pathname.startsWith('/guest') && 
+      !pathname.startsWith('/guest/access') && 
+      !pathname.startsWith('/guest/identify')) {
+    
+    const authHeader = request.headers.get('authorization')
+    const sessionToken = authHeader?.replace('Bearer ', '') || 
+                        request.cookies.get('guest-session')?.value
+
+    if (!sessionToken) {
+      return NextResponse.redirect(new URL('/guest/access', request.url))
+    }
+
+    const guestSession = await validateGuestSession(sessionToken)
+    
+    if (!guestSession) {
+      return NextResponse.redirect(new URL('/guest/access?expired=true', request.url))
+    }
+
+    // Add session data to headers for downstream use
+    const response = NextResponse.next()
+    response.headers.set('x-guest-id', guestSession.id)
+    response.headers.set('x-hotel-id', guestSession.hotelId)
+    response.headers.set('x-session-type', 'GUEST')
+    response.headers.set('x-conversation-id', guestSession.conversationId || '')
+    
+    return addSecurityHeaders(response, request)
+  }
+
+  // ===== ADMIN AUTHENTICATION (NextAuth) =====
   const token = await getToken({ 
     req: request,
     secret: process.env.NEXTAUTH_SECRET 
   })
-  const { pathname } = request.nextUrl
 
   // Public routes - no authentication needed
   const publicRoutes = [
@@ -304,6 +366,8 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/admin/:path*',
+    '/staff/:path*',
+    '/guest/:path*',
     '/profile/:path*',
     '/api/:path*',
     '/login',
