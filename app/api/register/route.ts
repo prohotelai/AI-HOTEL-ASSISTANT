@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { SystemRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { seedDefaultRoles } from '@/lib/services/rbac/rbacService'
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
           name,
           email,
           password: hashedPassword,
-          role: 'OWNER',
+          role: SystemRole.OWNER,
           hotelId: hotel.id,
           onboardingCompleted: false,
         }
