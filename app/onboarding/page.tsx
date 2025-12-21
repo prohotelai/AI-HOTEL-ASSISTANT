@@ -105,7 +105,7 @@ export default function OnboardingPage() {
               Welcome to AI Hotel Assistant!
             </h1>
             <p className="text-lg text-gray-600 mb-8">
-              Let's set up your hotel in just a few steps.
+              Let&apos;s set up your hotel in just a few steps.
             </p>
             <button
               onClick={() => setStep('hotel-setup')}
