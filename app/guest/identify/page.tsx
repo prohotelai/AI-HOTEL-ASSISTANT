@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { User, Key, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default function GuestIdentifyPage() {
   const router = useRouter()
   const searchParams = useSearchParams()

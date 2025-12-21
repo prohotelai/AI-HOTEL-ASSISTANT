@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default function StaffPasswordPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
