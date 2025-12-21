@@ -12,63 +12,63 @@ datasource db {
 
 // Multi-tenant: Each hotel is a tenant
 model Hotel {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
-  slug        String   @unique
+  slug        String  @unique
   description String?
   logo        String?
   website     String?
-  
+
   // Contact information
-  email       String?
-  phone       String?
-  address     String?
-  
+  email   String?
+  phone   String?
+  address String?
+
   // Widget configuration
-  widgetColor String?  @default("#3B82F6")
-  widgetTitle String?  @default("Chat with us")
-  
+  widgetColor String? @default("#3B82F6")
+  widgetTitle String? @default("Chat with us")
+
   // API keys for this tenant
-  openaiKey   String?  // Encrypted in production
-  pineconeKey String?  // Encrypted in production
-  stripeKey   String?  // Encrypted in production
-  
+  openaiKey   String? // Encrypted in production
+  pineconeKey String? // Encrypted in production
+  stripeKey   String? // Encrypted in production
+
   // Subscription & Billing (NEW)
-  subscriptionPlan     SubscriptionPlan   @default(STARTER)
-  subscriptionStatus   SubscriptionStatus @default(ACTIVE)
-  trialEndsAt          DateTime?
-  subscriptionEndsAt   DateTime?
-  
+  subscriptionPlan   SubscriptionPlan   @default(STARTER)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  trialEndsAt        DateTime?
+  subscriptionEndsAt DateTime?
+
   // 24/7 Support (Paid Plans Only)
-  supportEnabled       Boolean  @default(false)
-  supportActivatedAt   DateTime?
-  
+  supportEnabled     Boolean   @default(false)
+  supportActivatedAt DateTime?
+
   // Stripe integration
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique
-  
+
   // Usage Limits (per plan)
-  maxAIMessagesPerMonth Int @default(100)    // STARTER: 100, PRO: 1000, PRO_PLUS: 3000
-  maxVoiceMinutesPerMonth Int @default(0)    // STARTER: 0, PRO+: unlimited
-  maxTicketsPerMonth   Int @default(10)      // STARTER: 10, PRO+: unlimited
-  maxStorageGB         Int @default(1)       // STARTER: 1GB, ENTERPRISE: unlimited
-  
+  maxAIMessagesPerMonth   Int @default(100) // STARTER: 100, PRO: 1000, PRO_PLUS: 3000
+  maxVoiceMinutesPerMonth Int @default(0) // STARTER: 0, PRO+: unlimited
+  maxTicketsPerMonth      Int @default(10) // STARTER: 10, PRO+: unlimited
+  maxStorageGB            Int @default(1) // STARTER: 1GB, ENTERPRISE: unlimited
+
   // Current Usage (resets monthly)
-  currentMonthStart    DateTime @default(now())
-  aiMessagesUsed       Int @default(0)
-  voiceMinutesUsed     Int @default(0)
-  ticketsCreated       Int @default(0)
-  storageUsedGB        Float @default(0)
-  
+  currentMonthStart DateTime @default(now())
+  aiMessagesUsed    Int      @default(0)
+  voiceMinutesUsed  Int      @default(0)
+  ticketsCreated    Int      @default(0)
+  storageUsedGB     Float    @default(0)
+
   // Multi-tenancy relationships
-  users         User[]
-  conversations Conversation[]
-  roles         Role[]
-  qrTokens      GuestStaffQRToken[]
-  usageRecords  UsageRecord[]
-  auditLogs     AuditLog[]
+  users                 User[]
+  conversations         Conversation[]
+  roles                 Role[]
+  qrTokens              GuestStaffQRToken[]
+  usageRecords          UsageRecord[]
+  auditLogs             AuditLog[]
   mobileMagicLinkTokens MobileMagicLinkToken[]
-  
+
   // PMS relationships
   roomTypes          RoomType[]
   rooms              Room[]
@@ -76,31 +76,35 @@ model Hotel {
   bookings           Booking[]
   housekeepingTasks  HousekeepingTask[]
   maintenanceTickets MaintenanceTicket[]
-  
+
   // Phase 5: Billing & Folios
-  folios             Folio[]
-  invoices           Invoice[]
-  payments           Payment[]
-  keyIssueLogs       KeyIssueLog[]
-  tickets            Ticket[]
-  tags               Tag[]
-  
+  folios       Folio[]
+  invoices     Invoice[]
+  payments     Payment[]
+  keyIssueLogs KeyIssueLog[]
+  tickets      Ticket[]
+  tags         Tag[]
+
   // Phase 7: External PMS Integration
-  externalPMSConfig  ExternalPMSConfig?
-  
+  externalPMSConfig ExternalPMSConfig?
+
   // 24/7 Support
-  supportTickets     SupportTicket[]
-  
+  supportTickets SupportTicket[]
+
   // Onboarding (Additive Feature)
-  onboardingProgress OnboardingProgress?
-  onboardingLogs     OnboardingLog[]
-  widgetKeys         WidgetKey[]
-  staffInvitations   StaffInvitation[]
+  onboardingProgress  OnboardingProgress?
+  onboardingLogs      OnboardingLog[]
+  widgetKeys          WidgetKey[]
+  staffInvitations    StaffInvitation[]
   knowledgeBaseChunks KnowledgeBaseChunk[]
-  
+
+  // NEW: Session management
+  staffSessions StaffSession[]
+  guestSessions GuestSession[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([slug])
   @@index([subscriptionPlan])
   @@index([subscriptionStatus])
@@ -108,47 +112,57 @@ model Hotel {
 
 // NextAuth User model
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String?   // Hashed
-  image         String?
-  role          String    @default("user") // user, admin, super_admin
-  isSuspended   Boolean   @default(false)
-  suspendedAt   DateTime?
+  id               String     @id @default(cuid())
+  name             String?
+  email            String     @unique
+  emailVerified    DateTime?
+  password         String? // Hashed (for ADMIN/OWNER)
+  image            String?
+  role             SystemRole @default(GUEST)
+  isSuspended      Boolean    @default(false)
+  suspendedAt      DateTime?
   suspensionReason String?
-  
+
   // Multi-tenant: user belongs to hotel
-  hotelId       String?
-  hotel         Hotel?    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String?
+  hotel   Hotel?  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Onboarding state (for OWNER role)
   onboardingCompleted Boolean @default(false)
-  
-  accounts      Account[]
-  sessions      Session[]
-  conversations Conversation[]
-  userRoles     UserRole[]
-  qrTokens      GuestStaffQRToken[]
-  auditLogs     AuditLog[]
+
+  // Staff-specific fields
+  staffPassword      String? // Separate password for staff
+  mustChangePassword Boolean   @default(false)
+  lastPasswordChange DateTime?
+
+  // Guest identification (lookup only, not credentials)
+  guestPassportId String? // For guest lookup
+  guestRoomNumber String? // Current room assignment
+
+  accounts             Account[]
+  sessions             Session[]
+  conversations        Conversation[]
+  userRoles            UserRole[]
+  qrTokens             GuestStaffQRToken[]
+  auditLogs            AuditLog[]
   staffInvitationsSent StaffInvitation[]
-  
+  staffSessions        StaffSession[]
+
   // Phase 5: Support tickets
-  tickets             Ticket[]
-  ticketsAssigned     Ticket[]         @relation("TicketAssignedTo")
-  ticketsCreated      Ticket[]         @relation("TicketCreatedBy")
-  ticketComments      TicketComment[]
-  ticketTagsAssigned  TicketTag[]
-  ticketAudits        TicketAudit[]
-  
+  tickets            Ticket[]
+  ticketsAssigned    Ticket[]        @relation("TicketAssignedTo")
+  ticketsCreated     Ticket[]        @relation("TicketCreatedBy")
+  ticketComments     TicketComment[]
+  ticketTagsAssigned TicketTag[]
+  ticketAudits       TicketAudit[]
+
   // 24/7 Support Tickets
-  supportTickets      SupportTicket[]
+  supportTickets        SupportTicket[]
   mobileMagicLinkTokens MobileMagicLinkToken[]
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([email])
   @@index([hotelId])
 }
@@ -181,7 +195,7 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
 }
 
@@ -194,29 +208,90 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ========== NEW: SESSION MANAGEMENT (AUTH RESTRUCTURE) ==========
+
+// StaffSession: Limited-scope sessions for staff via QR + Password
+model StaffSession {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  sessionToken String      @unique
+  sessionType  SessionType @default(STAFF)
+
+  // Limited permissions (RBAC subset)
+  canAccessKB      Boolean @default(true)
+  canViewTickets   Boolean @default(true)
+  canCreateTickets Boolean @default(true)
+
+  // Session lifecycle
+  expiresAt    DateTime
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([hotelId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+}
+
+// GuestSession: Ephemeral sessions for guests via QR (no User record)
+model GuestSession {
+  id      String @id @default(cuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  // Guest identification (lookup only, not credentials)
+  guestName       String?
+  guestRoomNumber String?
+  guestPassportId String? // Lookup only, never stored as credential
+
+  sessionToken String      @unique
+  sessionType  SessionType @default(GUEST)
+
+  // Ephemeral - auto-expires (max 24h)
+  expiresAt    DateTime
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  // Link to conversation
+  conversationId String?       @unique
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([hotelId])
+  @@index([sessionToken])
+  @@index([guestRoomNumber])
+  @@index([expiresAt])
+}
+
 // Conversation: Chat session
 model Conversation {
-  id        String    @id @default(cuid())
-  title     String?   @default("New conversation")
-  
+  id    String  @id @default(cuid())
+  title String? @default("New conversation")
+
   // Multi-tenant: conversation belongs to hotel
-  hotelId   String
-  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Optional: if user is authenticated
-  userId    String?
-  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   // For anonymous widget users
-  guestId   String?   // Anonymous session ID
-  guestName String?
+  guestId    String? // Anonymous session ID
+  guestName  String?
   guestEmail String?
-  
-  messages  Message[]
-  
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  
+
+  messages Message[]
+
+  // NEW: Link to guest session (if via QR access)
+  guestSession GuestSession?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([userId])
   @@index([guestId])
@@ -224,19 +299,19 @@ model Conversation {
 
 // Message: Individual chat message
 model Message {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  role           String   // "user" or "assistant"
-  content        String   @db.Text
-  
+
+  role    String // "user" or "assistant"
+  content String @db.Text
+
   // AI metadata
-  tokens         Int?     // Token count
-  model          String?  // AI model used
-  
-  createdAt      DateTime @default(now())
-  
+  tokens Int? // Token count
+  model  String? // AI model used
+
+  createdAt DateTime @default(now())
+
   @@index([conversationId])
   @@index([createdAt])
 }
@@ -245,29 +320,29 @@ model Message {
 
 // Role: Defines permissions for a group of users
 model Role {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Role identity
-  name        String   // e.g., "Admin", "Manager", "Reception", "Housekeeping"
-  key         String   // e.g., "admin", "manager", "reception", "housekeeping" - unique per hotel
-  
+  name String // e.g., "Admin", "Manager", "Reception", "Housekeeping"
+  key  String // e.g., "admin", "manager", "reception", "housekeeping" - unique per hotel
+
   // Role hierarchy (higher = more permissions)
-  level       Int      @default(0) // 0=Guest, 1=Staff, 2=Supervisor, 3=Manager, 4=Admin
-  
+  level Int @default(0) // 0=Guest, 1=Staff, 2=Supervisor, 3=Manager, 4=Admin
+
   // Multi-tenant: each hotel has its own roles
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Description
   description String?
-  
+
   // Relations
   rolePermissions RolePermission[]
   userRoles       UserRole[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Indexes
   @@unique([hotelId, key])
   @@index([hotelId])
@@ -276,24 +351,24 @@ model Role {
 
 // Permission: Defines available actions/resources
 model Permission {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Permission identity (global, not hotel-scoped)
-  key         String   @unique // e.g., "pms.bookings.create", "tickets.assign"
-  name        String   // e.g., "Create Bookings"
+  key         String  @unique // e.g., "pms.bookings.create", "tickets.assign"
+  name        String // e.g., "Create Bookings"
   description String?
-  
+
   // Categorization
-  group       String   // e.g., "pms", "tickets", "crm", "housekeeping", "maintenance", "ai", "widget", "system"
-  resource    String   // e.g., "bookings", "tickets", "staff", "rooms"
-  action      String   // e.g., "create", "read", "update", "delete", "assign"
-  
+  group    String // e.g., "pms", "tickets", "crm", "housekeeping", "maintenance", "ai", "widget", "system"
+  resource String // e.g., "bookings", "tickets", "staff", "rooms"
+  action   String // e.g., "create", "read", "update", "delete", "assign"
+
   // Relations
   rolePermissions RolePermission[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Indexes
   @@index([group])
   @@index([key])
@@ -301,17 +376,17 @@ model Permission {
 
 // RolePermission: Junction table for Role ↔ Permission many-to-many
 model RolePermission {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Relations
-  roleId        String
-  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  
-  permissionId  String
-  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
-  createdAt     DateTime @default(now())
-  
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
   // Constraints
   @@unique([roleId, permissionId])
   @@index([roleId])
@@ -320,19 +395,19 @@ model RolePermission {
 
 // UserRole: Assign roles to users (with audit trail)
 model UserRole {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Relations
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  roleId      String
-  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
   // Audit trail
-  assignedBy  String?  // User ID who assigned this role
-  assignedAt  DateTime @default(now())
-  
+  assignedBy String? // User ID who assigned this role
+  assignedAt DateTime @default(now())
+
   // Constraints
   @@unique([userId, roleId])
   @@index([userId])
@@ -341,41 +416,47 @@ model UserRole {
 
 // GuestStaffQRTokens: QR code login tokens for guests and staff
 model GuestStaffQRToken {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant: belongs to hotel
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // User reference (can be guest or staff)
-  userId      String?
-  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // JWT token for session
-  token       String   @db.Text
-  
-  // Role type
-  role        String   // "guest" | "staff"
-  
+  token String @db.Text
+
+  // NEW: Purpose of QR (context resolution, not auth)
+  purpose QRPurpose @default(GUEST_ACCESS)
+
+  // NEW: Context data (not credentials)
+  contextData Json? // { role, hotelId, staffId?, etc. }
+
+  // Role type (DEPRECATED - use contextData.role instead)
+  role String? // "guest" | "staff"
+
   // Token lifecycle
-  issuedAt    DateTime @default(now())
-  expiresAt   DateTime // Token expiry time
-  usedAt      DateTime? // When token was used for login
-  
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime // Token expiry time
+  usedAt    DateTime? // When token was used for login
+
   // One-time use flag
-  isUsed      Boolean  @default(false)
-  
+  isUsed Boolean @default(false)
+
   // Audit trail
-  createdBy   String?  // Admin who created this token
-  revokedAt   DateTime? // When token was revoked
-  revokedBy   String?  // Admin who revoked token
-  
+  createdBy String? // Admin who created this token
+  revokedAt DateTime? // When token was revoked
+  revokedBy String? // Admin who revoked token
+
   // Metadata
-  metadata    String?  @db.Text // JSON metadata (e.g., device info, IP)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  metadata String? @db.Text // JSON metadata (e.g., device info, IP)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Constraints and indexes
   @@unique([token], name: "qr_token_unique")
   @@index([hotelId])
@@ -390,37 +471,37 @@ model GuestStaffQRToken {
 
 // AuditLog: Track all security events for compliance and investigation
 model AuditLog {
-  id           String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Context
-  hotelId      String
-  hotel        Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  sessionId    String?
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionId String?
+
   // Event details
-  eventType    String   // 'login', 'logout', 'token_rotation', 'suspicious_activity', etc.
-  action       String   // Human-readable action description
-  resourceType String?  // 'session', 'user', 'hotel', 'guest', 'room', 'ticket', etc.
+  eventType    String // 'login', 'logout', 'token_rotation', 'suspicious_activity', etc.
+  action       String // Human-readable action description
+  resourceType String? // 'session', 'user', 'hotel', 'guest', 'room', 'ticket', etc.
   resourceId   String?
-  
+
   // Request metadata
-  userAgent    String?
-  ipAddress    String?
-  
+  userAgent String?
+  ipAddress String?
+
   // Result
   success      Boolean
   errorMessage String?
-  severity     String   // 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
-  
+  severity     String // 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
+
   // Metadata (JSON)
-  metadata     Json?
-  
-  createdAt    DateTime @default(now())
-  
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
   @@index([hotelId])
   @@index([userId])
   @@index([sessionId])
@@ -432,21 +513,21 @@ model AuditLog {
 
 // RateLimitEntry: Per-endpoint rate limiting
 model RateLimitEntry {
-  id         String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Identifier (IP, user ID, or API key)
   identifier String
-  
+
   // Endpoint being rate limited
-  endpoint   String
-  
+  endpoint String
+
   // Counter
-  attempts   Int      @default(1)
-  
+  attempts Int @default(1)
+
   // Window
   lastAttempt DateTime @default(now())
   resetAt     DateTime
-  
+
   @@unique([identifier, endpoint])
   @@index([identifier])
   @@index([endpoint])
@@ -455,19 +536,19 @@ model RateLimitEntry {
 
 // Mobile app magic link tokens
 model MobileMagicLinkToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   hotelId   String
-  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   email     String
-  tokenHash String   @unique @map("token") // SHA-256 digest of magic link token
+  tokenHash String    @unique @map("token") // SHA-256 digest of magic link token
   expiresAt DateTime
   usedAt    DateTime?
   usedByIp  String?
   userAgent String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([hotelId, email])
   @@index([userId])
@@ -477,26 +558,26 @@ model MobileMagicLinkToken {
 
 // BruteForceAttempt: Track failed login attempts
 model BruteForceAttempt {
-  id           String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Identifier (IP, email, or user ID)
-  identifier   String   @unique
-  
+  identifier String @unique
+
   // Tracking
   attemptCount Int      @default(1)
   lastAttempt  DateTime @default(now())
-  
+
   // Lockout
-  isLocked     Boolean  @default(false)
-  lockedUntil  DateTime?
-  lockedAt     DateTime?
-  
+  isLocked    Boolean   @default(false)
+  lockedUntil DateTime?
+  lockedAt    DateTime?
+
   // Metadata
-  metadata     Json?    // IP, user agent, etc.
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
+  metadata Json? // IP, user agent, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([identifier])
   @@index([isLocked])
   @@index([lockedUntil])
@@ -506,81 +587,81 @@ model BruteForceAttempt {
 
 // Subscription Plans
 enum SubscriptionPlan {
-  STARTER         // $0 - 100 AI messages, 10 tickets, basic features
-  PRO             // $999 - 1000 AI messages, unlimited tickets, PMS, automation
-  PRO_PLUS        // $1,999 - 3000 AI messages, advanced features
+  STARTER // $0 - 100 AI messages, 10 tickets, basic features
+  PRO // $999 - 1000 AI messages, unlimited tickets, PMS, automation
+  PRO_PLUS // $1,999 - 3000 AI messages, advanced features
   ENTERPRISE_LITE // $2,999 - 5000 AI messages, enterprise features
-  ENTERPRISE_MAX  // $3,999 - 10,000 AI messages, 750-1000 rooms
+  ENTERPRISE_MAX // $3,999 - 10,000 AI messages, 750-1000 rooms
 }
 
 // Subscription Status
 enum SubscriptionStatus {
-  ACTIVE      // Paid and active
-  TRIALING    // In trial period
-  PAST_DUE    // Payment failed
-  CANCELED    // User canceled
-  EXPIRED     // Trial/subscription ended
-  PAUSED      // Manually paused
+  ACTIVE // Paid and active
+  TRIALING // In trial period
+  PAST_DUE // Payment failed
+  CANCELED // User canceled
+  EXPIRED // Trial/subscription ended
+  PAUSED // Manually paused
 }
 
 // ========== PMS CORE ENUMS ==========
 
 // Room Status
 enum RoomStatus {
-  AVAILABLE       // Ready for new guests
-  OCCUPIED        // Currently occupied
-  DIRTY           // Needs cleaning
-  CLEANING        // Being cleaned
-  INSPECTING      // Quality check
-  MAINTENANCE     // Under maintenance
-  OUT_OF_ORDER    // Not available for booking
-  BLOCKED         // Manually blocked
+  AVAILABLE // Ready for new guests
+  OCCUPIED // Currently occupied
+  DIRTY // Needs cleaning
+  CLEANING // Being cleaned
+  INSPECTING // Quality check
+  MAINTENANCE // Under maintenance
+  OUT_OF_ORDER // Not available for booking
+  BLOCKED // Manually blocked
 }
 
 // Booking Status
 enum BookingStatus {
-  PENDING         // Awaiting confirmation
-  CONFIRMED       // Confirmed reservation
-  CHECKED_IN      // Guest checked in
-  CHECKED_OUT     // Guest checked out
-  CANCELED        // Booking canceled
-  NO_SHOW         // Guest didn't arrive
+  PENDING // Awaiting confirmation
+  CONFIRMED // Confirmed reservation
+  CHECKED_IN // Guest checked in
+  CHECKED_OUT // Guest checked out
+  CANCELED // Booking canceled
+  NO_SHOW // Guest didn't arrive
 }
 
 // Booking Source
 enum BookingSource {
-  DIRECT          // Direct booking (website, phone)
-  OTA             // Online Travel Agency (Booking.com, Expedia)
-  WALK_IN         // Walk-in guest
-  CORPORATE       // Corporate booking
-  AGENT           // Travel agent
-  OTHER           // Other sources
+  DIRECT // Direct booking (website, phone)
+  OTA // Online Travel Agency (Booking.com, Expedia)
+  WALK_IN // Walk-in guest
+  CORPORATE // Corporate booking
+  AGENT // Travel agent
+  OTHER // Other sources
 }
 
 // Usage Record: Track monthly usage history
 model UsageRecord {
-  id        String   @id @default(cuid())
-  
-  hotelId   String
-  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  id String @id @default(cuid())
+
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Period
-  month     DateTime  // First day of the month
-  year      Int
-  
+  month DateTime // First day of the month
+  year  Int
+
   // Usage counters
-  aiMessages      Int @default(0)
-  voiceMinutes    Int @default(0)
-  ticketsCreated  Int @default(0)
-  storageUsedGB   Float @default(0)
-  
+  aiMessages     Int   @default(0)
+  voiceMinutes   Int   @default(0)
+  ticketsCreated Int   @default(0)
+  storageUsedGB  Float @default(0)
+
   // Billing
-  planAtTime      SubscriptionPlan
-  amountCharged   Float?
-  
+  planAtTime    SubscriptionPlan
+  amountCharged Float?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([hotelId, month])
   @@index([hotelId])
   @@index([month])
@@ -590,37 +671,37 @@ model UsageRecord {
 
 // RoomType: Defines room categories (e.g., Standard, Deluxe, Suite)
 model RoomType {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Room type details
-  name        String   // e.g., "Standard Double", "Deluxe Suite"
+  name        String // e.g., "Standard Double", "Deluxe Suite"
   description String?
-  
+
   // Pricing
-  basePrice   Float    // Base nightly rate
-  
+  basePrice Float // Base nightly rate
+
   // Capacity
-  maxOccupancy Int     @default(2)
-  
+  maxOccupancy Int @default(2)
+
   // Amenities (stored as JSON array)
-  amenities   Json?    // ["WiFi", "TV", "Mini Bar", "Balcony"]
-  
+  amenities Json? // ["WiFi", "TV", "Mini Bar", "Balcony"]
+
   // Metadata
-  images      Json?    // Array of image URLs
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
-  
+  images    Json? // Array of image URLs
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
   // Relations
   rooms            Room[]
   roomAvailability RoomAvailability[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([hotelId, name])
   @@index([hotelId])
   @@index([isActive])
@@ -628,38 +709,38 @@ model RoomType {
 
 // Room: Physical room inventory
 model Room {
-  id          String     @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Room identity
-  roomNumber  String     // e.g., "101", "203A"
-  floor       Int?       // Floor number
-  
+  roomNumber String // e.g., "101", "203A"
+  floor      Int? // Floor number
+
   // Room type
-  roomTypeId  String
-  roomType    RoomType   @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+
   // Status
-  status      RoomStatus @default(AVAILABLE)
-  isActive    Boolean    @default(true)
-  isOutOfService Boolean @default(false)
-  
+  status         RoomStatus @default(AVAILABLE)
+  isActive       Boolean    @default(true)
+  isOutOfService Boolean    @default(false)
+
   // Maintenance notes
   notes       String?
   lastCleaned DateTime?
-  
+
   // Relations
   bookings           Booking[]
   housekeepingTasks  HousekeepingTask[]
   maintenanceTickets MaintenanceTicket[]
   keyIssueLogs       KeyIssueLog[]
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([hotelId, roomNumber])
   @@index([hotelId])
   @@index([roomTypeId])
@@ -668,54 +749,54 @@ model Room {
 
 // Guest: Customer records
 model Guest {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Guest information
-  firstName   String
-  lastName    String
-  email       String?
-  phone       String?
-  
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+
   // Address
-  address     String?
-  city        String?
-  country     String?
-  postalCode  String?
-  
+  address    String?
+  city       String?
+  country    String?
+  postalCode String?
+
   // Identification
-  idType      String?  // "passport", "drivers_license", "national_id"
-  idNumber    String?
-  
+  idType   String? // "passport", "drivers_license", "national_id"
+  idNumber String?
+
   // Preferences
-  preferences Json?    // Dietary, room preferences, special requests
-  
+  preferences Json? // Dietary, room preferences, special requests
+
   // Notes
-  notes       String?
-  vipStatus   Boolean  @default(false)
-  
+  notes     String?
+  vipStatus Boolean @default(false)
+
   // Phase 5: Enhanced guest tracking
-  totalStays      Int      @default(0)
-  totalSpent      Decimal  @default(0) @db.Decimal(12, 2) // Lifetime spending
-  lastStayDate    DateTime?
-  language        String?  @default("en")
-  emailOptIn      Boolean  @default(true)
-  smsOptIn        Boolean  @default(false)
-  loyaltyPoints   Int      @default(0)
-  loyaltyTier     String?  // BRONZE, SILVER, GOLD, PLATINUM
-  
+  totalStays    Int       @default(0)
+  totalSpent    Decimal   @default(0) @db.Decimal(12, 2) // Lifetime spending
+  lastStayDate  DateTime?
+  language      String?   @default("en")
+  emailOptIn    Boolean   @default(true)
+  smsOptIn      Boolean   @default(false)
+  loyaltyPoints Int       @default(0)
+  loyaltyTier   String? // BRONZE, SILVER, GOLD, PLATINUM
+
   // Relations
-  bookings        Booking[]
-  folios          Folio[]
-  keyIssueLogs    KeyIssueLog[]
-  tickets         Ticket[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  bookings     Booking[]
+  folios       Folio[]
+  keyIssueLogs KeyIssueLog[]
+  tickets      Ticket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([email])
   @@index([phone])
@@ -726,64 +807,64 @@ model Guest {
 
 // Booking: Reservations
 model Booking {
-  id          String        @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Guest
-  guestId     String
-  guest       Guest         @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Restrict)
+
   // Room
-  roomId      String
-  room        Room          @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Restrict)
+
   // Booking details
   checkInDate  DateTime
   checkOutDate DateTime
-  
+
   // Confirmation
-  confirmationNumber String   @unique
-  
+  confirmationNumber String @unique
+
   // Status
-  status      BookingStatus @default(PENDING)
-  source      BookingSource @default(DIRECT)
-  
+  status BookingStatus @default(PENDING)
+  source BookingSource @default(DIRECT)
+
   // External PMS integration
-  externalId  String?       // ID from external PMS system (Opera, etc.)
-  
+  externalId String? // ID from external PMS system (Opera, etc.)
+
   // Pricing
   totalAmount Float
-  amountPaid  Float         @default(0)
-  currency    String        @default("USD")
-  
+  amountPaid  Float  @default(0)
+  currency    String @default("USD")
+
   // Guest count
-  adults      Int           @default(1)
-  children    Int           @default(0)
-  
+  adults   Int @default(1)
+  children Int @default(0)
+
   // Special requests
   specialRequests String?
-  
+
   // Notes
-  notes       String?
-  
+  notes String?
+
   // Check-in/out timestamps
   actualCheckIn  DateTime?
   actualCheckOut DateTime?
-  
+
   // Cancellation
-  canceledAt  DateTime?
+  canceledAt   DateTime?
   cancelReason String?
-  
+
   // Phase 5: Billing relations
-  folio       Folio?
+  folio        Folio?
   keyIssueLogs KeyIssueLog[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([guestId])
   @@index([roomId])
@@ -795,27 +876,27 @@ model Booking {
 
 // RoomAvailability: Daily availability cache for performance
 model RoomAvailability {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Room type
-  roomTypeId    String
-  roomType      RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
-  
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
   // Date
-  date          DateTime @db.Date
-  
+  date DateTime @db.Date
+
   // Availability metrics
-  totalRooms    Int      // Total rooms of this type
-  available     Int      // Available rooms
-  occupied      Int      // Occupied rooms
-  blocked       Int      // Blocked/maintenance rooms
-  
+  totalRooms Int // Total rooms of this type
+  available  Int // Available rooms
+  occupied   Int // Occupied rooms
+  blocked    Int // Blocked/maintenance rooms
+
   // Pricing (can vary by date)
-  rate          Float?   // Rate for this date (if dynamic pricing)
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  rate Float? // Rate for this date (if dynamic pricing)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([roomTypeId, date])
   @@index([roomTypeId])
   @@index([date])
@@ -844,40 +925,40 @@ enum HousekeepingTaskPriority {
 
 // HousekeepingTask: Track room cleaning and inspection
 model HousekeepingTask {
-  id          String                    @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel                     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Room reference
-  roomId      String
-  room        Room                      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
   // Task details
-  taskType    String                    // CHECKOUT_CLEAN, STAYOVER_CLEAN, DEEP_CLEAN, INSPECTION
-  status      HousekeepingTaskStatus    @default(PENDING)
-  priority    HousekeepingTaskPriority  @default(NORMAL)
-  
+  taskType String // CHECKOUT_CLEAN, STAYOVER_CLEAN, DEEP_CLEAN, INSPECTION
+  status   HousekeepingTaskStatus   @default(PENDING)
+  priority HousekeepingTaskPriority @default(NORMAL)
+
   // Assignment
-  assignedTo  String?                   // Staff user ID
-  assignedAt  DateTime?
-  
+  assignedTo String? // Staff user ID
+  assignedAt DateTime?
+
   // Timing
   scheduledFor DateTime?
-  startedAt   DateTime?
-  completedAt DateTime?
-  
+  startedAt    DateTime?
+  completedAt  DateTime?
+
   // Notes and issues
   notes       String?
-  issuesFound String?                   // Problems discovered during cleaning
-  
+  issuesFound String? // Problems discovered during cleaning
+
   // Credit tracking
-  credits     Int                       @default(0) // Housekeeping credits earned
-  
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
-  
+  credits Int @default(0) // Housekeeping credits earned
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([roomId])
   @@index([status])
@@ -907,46 +988,46 @@ enum MaintenanceStatus {
 
 // MaintenanceTicket: Track maintenance issues and repairs
 model MaintenanceTicket {
-  id          String              @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel               @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Room reference (optional - can be facility-wide)
-  roomId      String?
-  room        Room?               @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
   // Ticket details
   title       String
   description String              @db.Text
-  category    String              // PLUMBING, ELECTRICAL, HVAC, FURNITURE, APPLIANCE, STRUCTURAL, OTHER
+  category    String // PLUMBING, ELECTRICAL, HVAC, FURNITURE, APPLIANCE, STRUCTURAL, OTHER
   priority    MaintenancePriority @default(MEDIUM)
   status      MaintenanceStatus   @default(OPEN)
-  
+
   // Assignment
-  assignedTo  String?             // Staff user ID
-  assignedAt  DateTime?
-  
+  assignedTo String? // Staff user ID
+  assignedAt DateTime?
+
   // Reporter
-  reportedBy  String              // User ID who reported the issue
-  reportedAt  DateTime            @default(now())
-  
+  reportedBy String // User ID who reported the issue
+  reportedAt DateTime @default(now())
+
   // Resolution
-  resolvedAt  DateTime?
-  resolvedBy  String?
-  resolution  String?             @db.Text
-  
+  resolvedAt DateTime?
+  resolvedBy String?
+  resolution String?   @db.Text
+
   // Cost tracking
   estimatedCost Float?
   actualCost    Float?
-  
+
   // Room blocking
-  blocksRoom  Boolean             @default(false) // If true, room cannot be booked
-  
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  
+  blocksRoom Boolean @default(false) // If true, room cannot be booked
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([roomId])
   @@index([status])
@@ -955,62 +1036,63 @@ model MaintenanceTicket {
   @@index([blocksRoom])
   @@index([hotelId, status, priority])
 }
+
 // ============================================================================
 // PHASE 5: BILLING & FOLIOS
 // ============================================================================
 
 // Folio: Guest bill/account for a booking
 model Folio {
-  id              String      @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId         String
-  hotel           Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Booking reference
-  bookingId       String      @unique
-  booking         Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  
+  bookingId String  @unique
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   // Guest reference
-  guestId         String
-  guest           Guest       @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
   // Folio details
-  folioNumber     String      @unique // Human-readable folio number (e.g., "F-2024-00123")
-  status          FolioStatus @default(OPEN)
-  currency        String      @default("USD") // ISO 4217 currency code
-  
+  folioNumber String      @unique // Human-readable folio number (e.g., "F-2024-00123")
+  status      FolioStatus @default(OPEN)
+  currency    String      @default("USD") // ISO 4217 currency code
+
   // Totals (calculated from items) - using Decimal for financial precision
-  subtotal        Decimal     @default(0) @db.Decimal(10, 2)
-  taxAmount       Decimal     @default(0) @db.Decimal(10, 2)
-  totalAmount     Decimal     @default(0) @db.Decimal(10, 2)
-  paidAmount      Decimal     @default(0) @db.Decimal(10, 2)
-  balanceDue      Decimal     @default(0) @db.Decimal(10, 2)
-  
+  subtotal    Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount Decimal @default(0) @db.Decimal(10, 2)
+  paidAmount  Decimal @default(0) @db.Decimal(10, 2)
+  balanceDue  Decimal @default(0) @db.Decimal(10, 2)
+
   // Payment info
-  paymentStatus   PaymentStatus @default(UNPAID)
-  paymentMethod   String?       // CASH, CARD, BANK_TRANSFER, MOBILE_MONEY
-  paymentTerms    String?       // NET_30, IMMEDIATE, etc.
-  
+  paymentStatus PaymentStatus @default(UNPAID)
+  paymentMethod String? // CASH, CARD, BANK_TRANSFER, MOBILE_MONEY
+  paymentTerms  String? // NET_30, IMMEDIATE, etc.
+
   // Billing address
-  billingName     String?
-  billingAddress  String?
-  billingEmail    String?
-  billingPhone    String?
-  
+  billingName    String?
+  billingAddress String?
+  billingEmail   String?
+  billingPhone   String?
+
   // Items and payments
-  items           FolioItem[]
-  payments        Payment[]
-  invoices        Invoice[]
-  
+  items    FolioItem[]
+  payments Payment[]
+  invoices Invoice[]
+
   // Metadata
-  notes           String?       @db.Text
-  closedAt        DateTime?
-  closedBy        String?       // User ID who closed the folio
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
+  notes    String?   @db.Text
+  closedAt DateTime?
+  closedBy String? // User ID who closed the folio
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([bookingId])
   @@index([guestId])
@@ -1021,41 +1103,41 @@ model Folio {
 
 // FolioItem: Individual charge or credit on a folio
 model FolioItem {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Folio reference
-  folioId     String
-  folio       Folio    @relation(fields: [folioId], references: [id], onDelete: Cascade)
-  
+  folioId String
+  folio   Folio  @relation(fields: [folioId], references: [id], onDelete: Cascade)
+
   // Item details
   description String
-  category    String   // ROOM, F&B, LAUNDRY, MINIBAR, PHONE, INTERNET, PARKING, OTHER
-  quantity    Decimal  @default(1) @db.Decimal(10, 3)
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  totalPrice  Decimal  @db.Decimal(10, 2) // quantity * unitPrice (before tax)
-  taxRate     Decimal  @default(0) @db.Decimal(5, 2) // Percentage (e.g., 10.00 = 10%)
-  taxAmount   Decimal  @default(0) @db.Decimal(10, 2)
-  
+  category    String // ROOM, F&B, LAUNDRY, MINIBAR, PHONE, INTERNET, PARKING, OTHER
+  quantity    Decimal @default(1) @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  totalPrice  Decimal @db.Decimal(10, 2) // quantity * unitPrice (before tax)
+  taxRate     Decimal @default(0) @db.Decimal(5, 2) // Percentage (e.g., 10.00 = 10%)
+  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
+
   // Dates
   serviceDate DateTime @default(now()) // When service was provided
   postedAt    DateTime @default(now()) // When charge was posted
-  
+
   // References
-  referenceId String?  // External ID (e.g., POS transaction ID)
+  referenceId   String? // External ID (e.g., POS transaction ID)
   referenceType String? // ROOM_CHARGE, POS, MANUAL, CORRECTION
-  
+
   // Posted by
-  postedBy    String   // User ID who posted the charge
-  
+  postedBy String // User ID who posted the charge
+
   // Adjustments
-  isVoided    Boolean  @default(false)
-  voidedAt    DateTime?
-  voidedBy    String?
-  voidReason  String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  isVoided   Boolean   @default(false)
+  voidedAt   DateTime?
+  voidedBy   String?
+  voidReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([folioId])
   @@index([category])
   @@index([serviceDate])
@@ -1064,50 +1146,50 @@ model FolioItem {
 
 // Invoice: Generated document for payment
 model Invoice {
-  id              String        @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId         String
-  hotel           Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Folio reference
-  folioId         String
-  folio           Folio         @relation(fields: [folioId], references: [id], onDelete: Cascade)
-  
+  folioId String
+  folio   Folio  @relation(fields: [folioId], references: [id], onDelete: Cascade)
+
   // Invoice details
-  invoiceNumber   String        @unique // Human-readable (e.g., "INV-2024-00456")
-  status          InvoiceStatus @default(DRAFT)
-  currency        String        @default("USD") // ISO 4217 currency code
-  
+  invoiceNumber String        @unique // Human-readable (e.g., "INV-2024-00456")
+  status        InvoiceStatus @default(DRAFT)
+  currency      String        @default("USD") // ISO 4217 currency code
+
   // Amounts - using Decimal for financial precision
-  subtotal        Decimal       @db.Decimal(10, 2)
-  taxAmount       Decimal       @db.Decimal(10, 2)
-  totalAmount     Decimal       @db.Decimal(10, 2)
-  paidAmount      Decimal       @default(0) @db.Decimal(10, 2)
-  balanceDue      Decimal       @db.Decimal(10, 2)
-  
+  subtotal    Decimal @db.Decimal(10, 2)
+  taxAmount   Decimal @db.Decimal(10, 2)
+  totalAmount Decimal @db.Decimal(10, 2)
+  paidAmount  Decimal @default(0) @db.Decimal(10, 2)
+  balanceDue  Decimal @db.Decimal(10, 2)
+
   // Dates
-  issueDate       DateTime      @default(now())
-  dueDate         DateTime
-  paidDate        DateTime?
-  
+  issueDate DateTime  @default(now())
+  dueDate   DateTime
+  paidDate  DateTime?
+
   // Billing info (snapshot from folio)
-  billTo          Json          // {name, address, email, phone}
-  
+  billTo Json // {name, address, email, phone}
+
   // PDF generation
-  pdfUrl          String?       // S3/storage URL
-  pdfGeneratedAt  DateTime?
-  
+  pdfUrl         String? // S3/storage URL
+  pdfGeneratedAt DateTime?
+
   // Payment
-  payments        Payment[]
-  
+  payments Payment[]
+
   // Notes
-  notes           String?       @db.Text
-  termsAndConditions String?    @db.Text
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
+  notes              String? @db.Text
+  termsAndConditions String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([folioId])
   @@index([status])
@@ -1117,54 +1199,54 @@ model Invoice {
 
 // Payment: Payment transaction
 model Payment {
-  id              String        @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId         String
-  hotel           Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // References
-  folioId         String
-  folio           Folio         @relation(fields: [folioId], references: [id], onDelete: Cascade)
-  
-  invoiceId       String?
-  invoice         Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  
+  folioId String
+  folio   Folio  @relation(fields: [folioId], references: [id], onDelete: Cascade)
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
   // Payment details
-  amount          Decimal       @db.Decimal(10, 2)
-  currency        String        @default("USD")
-  paymentMethod   String        // CASH, CARD, BANK_TRANSFER, MOBILE_MONEY, CHECK
-  
+  amount        Decimal @db.Decimal(10, 2)
+  currency      String  @default("USD")
+  paymentMethod String // CASH, CARD, BANK_TRANSFER, MOBILE_MONEY, CHECK
+
   // Card/online payment details
-  paymentGateway  String?       // STRIPE, PAYPAL, SQUARE, etc.
-  transactionId   String?       // External transaction ID
-  cardLast4       String?
-  cardBrand       String?       // VISA, MASTERCARD, AMEX
-  
+  paymentGateway String? // STRIPE, PAYPAL, SQUARE, etc.
+  transactionId  String? // External transaction ID
+  cardLast4      String?
+  cardBrand      String? // VISA, MASTERCARD, AMEX
+
   // Status
-  status          PaymentStatus @default(PENDING)
-  
+  status PaymentStatus @default(PENDING)
+
   // Dates
-  paymentDate     DateTime      @default(now())
-  processedAt     DateTime?
-  
+  paymentDate DateTime  @default(now())
+  processedAt DateTime?
+
   // Receipt
-  receiptNumber   String?       @unique
-  receiptUrl      String?       // PDF receipt URL
-  
+  receiptNumber String? @unique
+  receiptUrl    String? // PDF receipt URL
+
   // Processing
-  processedBy     String?       // User ID who processed payment
-  
+  processedBy String? // User ID who processed payment
+
   // Notes
-  notes           String?
-  
+  notes String?
+
   // Refund info
-  isRefund        Boolean       @default(false)
-  refundedPaymentId String?     // If this is a refund, reference to original payment
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
+  isRefund          Boolean @default(false)
+  refundedPaymentId String? // If this is a refund, reference to original payment
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([folioId])
   @@index([invoiceId])
@@ -1176,47 +1258,47 @@ model Payment {
 
 // KeyIssueLog: Track room key distribution
 model KeyIssueLog {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Booking reference
-  bookingId   String
-  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   // Room and guest
-  roomId      String
-  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  
-  guestId     String
-  guest       Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
   // Key details
-  keyType     String   // PHYSICAL, CARD, MOBILE, CODE
-  keyNumber   String?  // Physical key number or card ID
-  
+  keyType   String // PHYSICAL, CARD, MOBILE, CODE
+  keyNumber String? // Physical key number or card ID
+
   // Issuance
-  issuedAt    DateTime @default(now())
-  issuedBy    String   // User ID who issued the key
-  
+  issuedAt DateTime @default(now())
+  issuedBy String // User ID who issued the key
+
   // Return
-  returnedAt  DateTime?
-  returnedBy  String?  // User ID who received returned key
-  
+  returnedAt DateTime?
+  returnedBy String? // User ID who received returned key
+
   // Lost key handling
-  isLost      Boolean  @default(false)
-  lostAt      DateTime?
-  lostFee     Decimal? @db.Decimal(10, 2)
-  lostFeeCharged Boolean @default(false)
-  
+  isLost         Boolean   @default(false)
+  lostAt         DateTime?
+  lostFee        Decimal?  @db.Decimal(10, 2)
+  lostFeeCharged Boolean   @default(false)
+
   // Notes
-  notes       String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([bookingId])
   @@index([roomId])
@@ -1227,62 +1309,62 @@ model KeyIssueLog {
 
 // Ticket: Support ticket system (separate from MaintenanceTicket)
 model Ticket {
-  id          String       @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Reporter (can be guest or staff)
-  userId      String       // Can be guest user or staff user
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  userId String // Can be guest user or staff user
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Optional guest reference
-  guestId     String?
-  guest       Guest?       @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id], onDelete: SetNull)
+
   // Guest details (denormalized for quick access)
-  guestName   String?
-  guestEmail  String?
-  guestRoom   String?
-  
+  guestName  String?
+  guestEmail String?
+  guestRoom  String?
+
   // Ticket details
   title       String
-  description String       @db.Text
+  description String         @db.Text
   priority    TicketPriority @default(MEDIUM)
-  status      TicketStatus @default(OPEN)
-  source      String       @default("MANUAL") // AI_AGENT, WIDGET, DASHBOARD, EMAIL, PHONE
-  
+  status      TicketStatus   @default(OPEN)
+  source      String         @default("MANUAL") // AI_AGENT, WIDGET, DASHBOARD, EMAIL, PHONE
+
   // SLA tracking
-  slaMinutes     Int?
-  dueAt          DateTime?
+  slaMinutes      Int?
+  dueAt           DateTime?
   escalationLevel Int       @default(0)
-  
+
   // Assignment
-  assignedToId String?      // Staff user ID
-  assignedTo   User?   @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId String? // Staff user ID
+  assignedTo   User?     @relation("TicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedAt   DateTime?
-  
+
   // Created by
-  createdById  String
-  createdBy    User    @relation("TicketCreatedBy", fields: [createdById], references: [id])
-  
+  createdById String
+  createdBy   User   @relation("TicketCreatedBy", fields: [createdById], references: [id])
+
   // Resolution
-  resolvedAt  DateTime?
-  resolvedBy  String?
-  resolution  String?      @db.Text
-  
+  resolvedAt DateTime?
+  resolvedBy String?
+  resolution String?   @db.Text
+
   // Conversation link
   conversationId String?
-  
+
   // Relations
-  comments    TicketComment[]
-  tags        TicketTag[]
-  audits      TicketAudit[]
-  
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  
+  comments TicketComment[]
+  tags     TicketTag[]
+  audits   TicketAudit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([userId])
   @@index([guestId])
@@ -1294,54 +1376,54 @@ model Ticket {
 
 // TicketComment: Comments on tickets
 model TicketComment {
-  id        String   @id @default(cuid())
-  
-  ticketId  String
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  content   String   @db.Text
+  id String @id @default(cuid())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content    String  @db.Text
   isInternal Boolean @default(false) // Internal staff notes vs customer-visible
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([ticketId])
   @@index([userId])
 }
 
 // Tag: Reusable tags for tickets
 model Tag {
-  id      String      @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   hotelId String
-  hotel   Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
-  name    String
-  color   String      @default("#3B82F6")
-  
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  name  String
+  color String @default("#3B82F6")
+
   tickets TicketTag[]
-  
+
   createdAt DateTime @default(now())
-  
+
   @@unique([hotelId, name])
   @@index([hotelId])
 }
 
 // TicketTag: Many-to-many relation between Ticket and Tag
 model TicketTag {
-  ticketId      String
-  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  
-  tagId         String
-  tag           Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  
-  assignedById  String
-  assignedBy    User     @relation(fields: [assignedById], references: [id])
-  assignedAt    DateTime @default(now())
-  
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  assignedById String
+  assignedBy   User     @relation(fields: [assignedById], references: [id])
+  assignedAt   DateTime @default(now())
+
   @@id([ticketId, tagId])
   @@index([ticketId])
   @@index([tagId])
@@ -1349,18 +1431,18 @@ model TicketTag {
 
 // TicketAudit: Audit log for ticket changes
 model TicketAudit {
-  id        String   @id @default(cuid())
-  ticketId  String
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  
-  actorId   String?
-  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  
-  action    String   // CREATED, UPDATED, ASSIGNED, RESOLVED, etc.
-  payload   Json?    // Changed fields
-  
+  id       String @id @default(cuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  action  String // CREATED, UPDATED, ASSIGNED, RESOLVED, etc.
+  payload Json? // Changed fields
+
   createdAt DateTime @default(now())
-  
+
   @@index([ticketId])
   @@index([actorId])
   @@index([createdAt])
@@ -1412,61 +1494,62 @@ enum TicketStatus {
 
 // Phase 7: External PMS Configuration
 model ExternalPMSConfig {
-  id                String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId           String   @unique
-  hotel             Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String @unique
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // PMS Details
-  pmsType           String   // OPERA, MEWS, CLOUDBEDS, PROTEL, APALEO, CUSTOM
-  apiKeyEncrypted   String   // Encrypted API key/token
-  version           String?  // PMS version (e.g., "5.0", "2023.1")
-  endpoint          String?  // Optional custom endpoint URL
-  
+  pmsType         String // OPERA, MEWS, CLOUDBEDS, PROTEL, APALEO, CUSTOM
+  apiKeyEncrypted String // Encrypted API key/token
+  version         String? // PMS version (e.g., "5.0", "2023.1")
+  endpoint        String? // Optional custom endpoint URL
+
   // Status
-  status            String   @default("PENDING") // PENDING, CONNECTED, FAILED, DISABLED
-  lastSyncedAt      DateTime?
-  lastError         String?  @db.Text
-  
+  status       String    @default("PENDING") // PENDING, CONNECTED, FAILED, DISABLED
+  lastSyncedAt DateTime?
+  lastError    String?   @db.Text
+
   // Metadata
-  metadata          Json?    // Additional config specific to PMS type
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  metadata Json? // Additional config specific to PMS type
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([status])
 }
+
 // 24/7 Support Tickets (Paid Plans Only)
 model SupportTicket {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Multi-tenant
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // User who created ticket
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
   // Ticket Details
-  subject     String
-  issue       String   @db.Text
-  status      SupportTicketStatus @default(OPEN)
-  priority    SupportPriority @default(MEDIUM)
-  
+  subject  String
+  issue    String              @db.Text
+  status   SupportTicketStatus @default(OPEN)
+  priority SupportPriority     @default(MEDIUM)
+
   // Resolution
-  resolution  String?  @db.Text
-  resolvedAt  DateTime?
-  resolvedBy  String?  // Admin/support user ID
-  
+  resolution String?   @db.Text
+  resolvedAt DateTime?
+  resolvedBy String? // Admin/support user ID
+
   // Metadata
-  metadata    Json?    // Additional context (browser, error logs, etc.)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  metadata Json? // Additional context (browser, error logs, etc.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([userId])
   @@index([status])
@@ -1495,47 +1578,47 @@ enum SupportPriority {
 
 // Track onboarding progress per hotel workspace
 model OnboardingProgress {
-  id             String   @id @default(cuid())
-  hotelId        String   @unique
-  hotel          Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(cuid())
+  hotelId String @unique
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Progress tracking
-  currentStep    String   @default("welcome")
-  stepsCompleted Json     @default("[]") // Array of completed step IDs
-  fastTrackMode  Boolean  @default(false)
-  
+  currentStep    String  @default("welcome")
+  stepsCompleted Json    @default("[]") // Array of completed step IDs
+  fastTrackMode  Boolean @default(false)
+
   // Completion status
-  isCompleted    Boolean  @default(false)
-  completedAt    DateTime?
-  skippedAt      DateTime?
-  
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  skippedAt   DateTime?
+
   // Session metadata
-  totalTimeSpent Int      @default(0) // seconds
-  lastStepTime   Int      @default(0) // seconds on current step
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  
+  totalTimeSpent Int @default(0) // seconds
+  lastStepTime   Int @default(0) // seconds on current step
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([isCompleted])
 }
 
 // Log onboarding events for analytics
 model OnboardingLog {
-  id          String   @id @default(cuid())
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(cuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Event details
-  event       String   // step_started, step_completed, step_skipped, import_success, etc.
-  step        String?  // Step identifier
-  meta        Json?    // Additional event metadata
-  
+  event String // step_started, step_completed, step_skipped, import_success, etc.
+  step  String? // Step identifier
+  meta  Json? // Additional event metadata
+
   // Timing
-  duration    Int?     // milliseconds for timed events
-  
-  createdAt   DateTime @default(now())
-  
+  duration Int? // milliseconds for timed events
+
+  createdAt DateTime @default(now())
+
   @@index([hotelId])
   @@index([event])
   @@index([createdAt])
@@ -1543,26 +1626,26 @@ model OnboardingLog {
 
 // Widget keys for embedded chat (hashed for security)
 model WidgetKey {
-  id          String   @id @default(cuid())
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(cuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Security
-  keyHash     String   @unique // Hashed widget key
-  keyPrefix   String   // First 8 chars for display (e.g., "wk_1234...")
-  
+  keyHash   String @unique // Hashed widget key
+  keyPrefix String // First 8 chars for display (e.g., "wk_1234...")
+
   // Status
-  isActive    Boolean  @default(true)
-  lastUsedAt  DateTime?
-  usageCount  Int      @default(0)
-  
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  usageCount Int       @default(0)
+
   // Metadata
-  label       String?  // e.g., "Production Widget", "Test Widget"
-  createdBy   String   // User ID who created it
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  label     String? // e.g., "Production Widget", "Test Widget"
+  createdBy String // User ID who created it
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([keyHash])
   @@index([isActive])
@@ -1570,45 +1653,72 @@ model WidgetKey {
 
 // Staff invitations for onboarding
 model StaffInvitation {
-  id           String    @id @default(cuid())
-  hotelId      String
-  hotel        Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  email        String
-  role         String    // manager, reception, staff, housekeeping, maintenance
-  tokenHash    String    @unique @map("token") // SHA-256 digest of invite token
-  invitedById  String
-  invitedBy    User      @relation(fields: [invitedById], references: [id])
-  acceptedAt   DateTime?
-  expiresAt    DateTime
-  createdAt    DateTime  @default(now())
-  
+  id          String    @id @default(cuid())
+  hotelId     String
+  hotel       Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  email       String
+  role        String // manager, reception, staff, housekeeping, maintenance
+  tokenHash   String    @unique @map("token") // SHA-256 digest of invite token
+  invitedById String
+  invitedBy   User      @relation(fields: [invitedById], references: [id])
+  acceptedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
   @@index([hotelId])
   @@index([tokenHash])
 }
 
 // Knowledge base chunks for AI retrieval and onboarding
 model KnowledgeBaseChunk {
-  id          String   @id @default(cuid())
-  hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(cuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
   // Content
-  content     String   @db.Text
-  
+  content String @db.Text
+
   // Metadata for retrieval and filtering
-  metadata    Json?    // source, category, tags, title, etc.
-  
+  metadata Json? // source, category, tags, title, etc.
+
   // Vector embeddings (optional - stored in Pinecone if available)
-  embedding   Json?    // Fallback if Pinecone not configured
-  
+  embedding Json? // Fallback if Pinecone not configured
+
   // Import tracking
-  importBatchId String?  // Group chunks from same import for rollback
-  source      String?    // "website_scan", "manual", "url", "file_upload"
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  importBatchId String? // Group chunks from same import for rollback
+  source        String? // "website_scan", "manual", "url", "file_upload"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hotelId])
   @@index([importBatchId])
   @@index([source])
+}
+
+// ========== ENUMS ==========
+
+// NEW: Session type for auth restructure
+enum SessionType {
+  ADMIN // Full SaaS access (Owner/Manager)
+  STAFF // Limited staff console access
+  GUEST // Ephemeral chat-only access
+}
+
+// NEW: User role enum (replaces string role field)
+enum SystemRole {
+  OWNER // Hotel owner (full admin access)
+  MANAGER // Hotel manager (admin access)
+  RECEPTION // Front desk staff
+  STAFF // General hotel staff
+  GUEST // Hotel guest (ephemeral)
+  AI_AGENT // AI bot identity
+}
+
+// NEW: QR code purpose enum
+enum QRPurpose {
+  GUEST_ACCESS // Guest chat access
+  STAFF_ACCESS // Staff console access
+  ROOM_SERVICE // Direct room service
+  MAINTENANCE // Maintenance request
 }
