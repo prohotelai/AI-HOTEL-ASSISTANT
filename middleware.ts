@@ -158,15 +158,11 @@ export async function middleware(request: NextRequest) {
       return routeAccessDenied(request, '/403')
     }
 
-    // Extract role from NextAuth token
-    const userRole = (token.role as string) || 'guest'
-    const hotelId = token.hotelId as string
-
     // ===== ROLE-BASED ROUTE PROTECTION =====
 
     // Admin dashboard - Admin only
     if (pathname.startsWith('/dashboard/admin')) {
-      if (userRole.toLowerCase() !== 'admin') {
+      if (userRole.toLowerCase() !== 'admin' && userRole.toLowerCase() !== 'owner') {
         return routeAccessDenied(request, '/403')
       }
     }
