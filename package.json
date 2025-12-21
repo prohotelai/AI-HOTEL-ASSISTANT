@@ -1,6 +1,6 @@
 {
   "name": "ai-hotel-assistant",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "A comprehensive multi-tenant SaaS platform offering AI-powered conversational agents, knowledge base management, website auto-scanning, and PMS integrations for hotels.",
   "main": "index.js",
   "scripts": {
