@@ -5,98 +5,116 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { SystemRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { seedDefaultRoles } from '@/lib/services/rbac/rbacService'
 
+/**
+ * ADMIN REGISTRATION ENDPOINT
+ * 
+ * Purpose: Create OWNER account ONLY
+ * Hotel setup happens in /admin/onboarding wizard
+ * 
+ * Flow:
+ * 1. Signup → Create OWNER user (hotelId = null)
+ * 2. Login → Redirect to /admin/onboarding
+ * 3. Onboarding → Create hotel + link user
+ */
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, hotelName } = await req.json()
+    // Parse request body
+    const body = await req.json()
+    const { name, email, password } = body
 
-    // Validate input
-    if (!name || !email || !password || !hotelName) {
+    // Validate required fields
+    if (!email || !password) {
       return NextResponse.json(
-        { error: 'All fields are required' },
+        { error: 'Email and password are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters' },
         { status: 400 }
       )
     }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: email.toLowerCase() }
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'User already exists' },
+        { error: 'An account with this email already exists' },
         { status: 400 }
       )
     }
 
-    // Hash password
+    // Hash password (bcrypt cost 10)
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create hotel slug from name
-    const slug = hotelName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-
-    // Check if slug already exists
-    const existingHotel = await prisma.hotel.findUnique({
-      where: { slug }
+    // Create OWNER user (no hotel yet - that happens in onboarding)
+    const user = await prisma.user.create({
+      data: {
+        name: name || null,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        role: SystemRole.OWNER,
+        hotelId: null, // Hotel created in onboarding wizard
+        onboardingCompleted: false,
+      }
     })
 
-    if (existingHotel) {
+    console.log('User registered successfully:', { 
+      userId: user.id, 
+      email: user.email,
+      role: user.role 
+    })
+
+    // Return success
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Account created successfully',
+        userId: user.id,
+        email: user.email,
+        onboardingRequired: true,
+      },
+      { status: 201 }
+    )
+
+  } catch (error: any) {
+    // Log full error for debugging
+    console.error('REGISTER_ERROR:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    })
+
+    // Check for specific database errors
+    if (error?.code === 'P2002') {
       return NextResponse.json(
-        { error: 'Hotel name already taken. Please choose a different name.' },
+        { error: 'An account with this email already exists' },
         { status: 400 }
       )
     }
 
-    // Create hotel and user in a transaction
-    const result = await prisma.$transaction(async (tx: any) => {
-      // Create hotel (DRAFT status - will be activated after onboarding)
-      const hotel = await tx.hotel.create({
-        data: {
-          name: hotelName,
-          slug,
-        }
-      })
-
-      // Create user with OWNER role and link to hotel
-      const user = await tx.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          role: SystemRole.OWNER,
-          hotelId: hotel.id,
-          onboardingCompleted: false,
-        }
-      })
-
-      return { hotel, user }
-    })
-
-    // Seed default RBAC roles for the new hotel
-    const rolesResult = await seedDefaultRoles(result.hotel.id)
-    if (!rolesResult.success) {
-      console.warn('Failed to seed default roles:', rolesResult.error)
-    }
-
-    return NextResponse.json({
-      message: 'Registration successful',
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        role: result.user.role,
-        hotelId: result.user.hotelId,
-        onboardingCompleted: result.user.onboardingCompleted,
-      }
-    })
-  } catch (error) {
-    console.error('Registration error:', error)
+    // Generic error response
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Registration failed. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      },
       { status: 500 }
     )
   }

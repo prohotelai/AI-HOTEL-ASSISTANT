@@ -115,8 +115,6 @@ export default function RegisterPage() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="new-password"
-                required
                 minLength={8}
                 value={formData.password}
                 onChange={handleChange}
@@ -135,8 +133,10 @@ export default function RegisterPage() {
           </Button>
 
           <p className="text-xs text-center text-gray-500">
-            After signup, you&apos;ll complete hotel setup in the onboarding wizard
-          </p>
+            After signup, you'll complete hotel setup in the onboarding wizard
+          </p
+            {isLoading ? 'Creating account...' : 'Create account'}
+          </Button>
         </form>
       </div>
     </div>
