@@ -13,7 +13,6 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    hotelName: '',
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -35,7 +34,8 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Registration failed')
       }
 
-      router.push('/login?registered=true')
+      // Redirect to owner login to authenticate, then they'll be redirected to onboarding
+      router.push('/owner-login?registered=true')
     } catch (error: any) {
       setError(error.message || 'An error occurred. Please try again.')
     } finally {
@@ -59,7 +59,7 @@ export default function RegisterPage() {
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/owner-login" className="font-medium text-blue-600 hover:text-blue-500">
               Sign in
             </Link>
           </p>
@@ -115,21 +115,6 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 required
                 value={formData.password}
-                onChange={handleChange}
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="hotelName" className="block text-sm font-medium text-gray-700">
-                Hotel name
-              </label>
-              <Input
-                id="hotelName"
-                name="hotelName"
-                type="text"
-                required
-                value={formData.hotelName}
                 onChange={handleChange}
                 className="mt-1"
               />

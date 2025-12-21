@@ -87,8 +87,11 @@ export default function LoginContent() {
               <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Hotel Login</h1>
-          <p className="text-gray-600 mt-2">Enter your ID to access your account</p>
+          <h1 className="text-2xl font-bold text-gray-900">Guest/Staff Login</h1>
+          <p className="text-gray-600 mt-2">Scan QR code to access hotel services</p>
+          <Link href="/owner-login" className="text-sm text-indigo-600 hover:text-indigo-700 mt-2 inline-block">
+            Hotel Owner? Login here →
+          </Link>
         </div>
 
         {/* Token Info */}

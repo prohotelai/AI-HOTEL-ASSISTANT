@@ -123,6 +123,9 @@ model User {
   hotelId       String?
   hotel         Hotel?    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   
+  // Onboarding state (for OWNER role)
+  onboardingCompleted Boolean @default(false)
+  
   accounts      Account[]
   sessions      Session[]
   conversations Conversation[]

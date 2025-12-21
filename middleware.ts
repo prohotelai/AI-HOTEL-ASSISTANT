@@ -25,6 +25,7 @@ export async function middleware(request: NextRequest) {
   // Public routes - no authentication needed
   const publicRoutes = [
     '/login',
+    '/owner-login',
     '/register',
     '/forgot-password',
     '/reset-password',
@@ -34,6 +35,9 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
   
+  // Onboarding route - accessible only to authenticated users without hotel
+  const isOnboardingRoute = pathname.startsWith('/onboarding')
+  
   // Allow public routes and API auth endpoints
   if (isPublicRoute || pathname.startsWith('/api/auth')) {
     return addSecurityHeaders(NextResponse.next(), request)
@@ -42,6 +46,59 @@ export async function middleware(request: NextRequest) {
   // Allow QR universal API endpoints (no auth required, rate limited instead)
   if (pathname.startsWith('/api/qr/universal')) {
     return addSecurityHeaders(NextResponse.next(), request)
+  }
+
+  // Allow onboarding API endpoints for authenticated users
+  if (pathname.startsWith('/api/onboarding')) {
+    if (!token || !token.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    return addSecurityHeaders(NextResponse.next(), request)
+  }
+
+  // ===== ONBOARDING FLOW ENFORCEMENT =====
+  
+  // Check if user is authenticated
+  if (!token || !token.id) {
+    // Not authenticated - redirect to login unless on onboarding page
+    if (isOnboardingRoute) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('callbackUrl', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+  } else {
+    // User is authenticated - enforce onboarding for OWNER role without hotel
+    const userRole = (token.role as string) || 'guest'
+    const hotelId = token.hotelId as string | null
+    const onboardingCompleted = token.onboardingCompleted as boolean | undefined
+
+    // OWNER without hotel should be on onboarding
+    if (userRole === 'OWNER' || userRole === 'owner') {
+      if (!hotelId || !onboardingCompleted) {
+        // User needs to complete onboarding
+        if (!isOnboardingRoute) {
+          // Redirect to onboarding if trying to access protected routes
+          if (pathname.startsWith('/dashboard') || pathname.startsWith('/profile')) {
+            const onboardingUrl = new URL('/onboarding', request.url)
+            return NextResponse.redirect(onboardingUrl)
+          }
+        }
+        // Allow access to onboarding pages
+        if (isOnboardingRoute) {
+          return addSecurityHeaders(NextResponse.next(), request)
+        }
+      } else {
+        // User has completed onboarding
+        if (isOnboardingRoute) {
+          // Redirect to dashboard if trying to access onboarding after completion
+          const dashboardUrl = new URL('/dashboard', request.url)
+          return NextResponse.redirect(dashboardUrl)
+        }
+      }
+    }
   }
 
   // Protected routes - require authentication
@@ -57,7 +114,7 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedRoute) {
     // Check for valid authentication
-    if (!token || !token.id || !token.hotelId) {
+    if (!token || !token.id) {
       // Not authenticated - redirect to login
       if (pathname.startsWith('/api/')) {
         // API routes return JSON
@@ -71,6 +128,34 @@ export async function middleware(request: NextRequest) {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('callbackUrl', pathname)
       return NextResponse.redirect(loginUrl)
+    }
+
+    // Check if authenticated user has completed onboarding (OWNER role only)
+    const userRole = (token.role as string) || 'guest'
+    const hotelId = token.hotelId as string | null
+    const onboardingCompleted = token.onboardingCompleted as boolean | undefined
+
+    if ((userRole === 'OWNER' || userRole === 'owner') && (!hotelId || !onboardingCompleted)) {
+      // OWNER without completed onboarding - redirect to onboarding
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'Onboarding required' },
+          { status: 403 }
+        )
+      }
+      const onboardingUrl = new URL('/onboarding', request.url)
+      return NextResponse.redirect(onboardingUrl)
+    }
+
+    // Ensure hotelId exists for non-OWNER roles
+    if (!hotelId && userRole !== 'OWNER' && userRole !== 'owner') {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'No hotel associated with user' },
+          { status: 403 }
+        )
+      }
+      return routeAccessDenied(request, '/403')
     }
 
     // Extract role from NextAuth token
@@ -205,5 +290,5 @@ function addSecurityHeaders(
 
 // Configure which routes use this middleware
 export const config = {
-  matcher: ['/dashboard/:path*', '/profile/:path*', '/api/:path*', '/login', '/register']
+  matcher: ['/dashboard/:path*', '/profile/:path*', '/api/:path*', '/login', '/owner-login', '/register', '/onboarding/:path*']
 }

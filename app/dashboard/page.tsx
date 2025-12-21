@@ -17,8 +17,15 @@ export default function DashboardHome() {
     if (status === 'authenticated' && session?.user?.role) {
       // Redirect based on role
       const role = session.user.role.toUpperCase()
+      const user = session.user as any
 
-      if (role === 'ADMIN') {
+      // Check if OWNER needs onboarding
+      if (role === 'OWNER' && (!user.hotelId || !user.onboardingCompleted)) {
+        router.push('/onboarding')
+        return
+      }
+
+      if (role === 'ADMIN' || role === 'OWNER') {
         router.push('/dashboard/admin/pms')
       } else if (role === 'STAFF') {
         router.push('/dashboard/staff/tasks')

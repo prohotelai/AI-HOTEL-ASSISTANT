@@ -54,7 +54,8 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role,
           hotelId: user.hotelId,
-          mustChangePassword: metadata.mustChangePassword || false
+          mustChangePassword: metadata.mustChangePassword || false,
+          onboardingCompleted: (user as any).onboardingCompleted || false
         }
       }
     })
@@ -70,6 +71,7 @@ export const authOptions: NextAuthOptions = {
         token.suspendedAt = (user as any).suspendedAt ?? null
         token.suspensionReason = (user as any).suspensionReason ?? null
         token.suspensionCheckedAt = Date.now()
+        token.onboardingCompleted = (user as any).onboardingCompleted ?? false
       }
 
       if (!user && token.id) {
@@ -132,6 +134,7 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as any).isSuspended = Boolean(token.isSuspended)
         ;(session.user as any).suspendedAt = token.suspendedAt ?? null
         ;(session.user as any).suspensionReason = token.suspensionReason ?? null
+        ;(session.user as any).onboardingCompleted = token.onboardingCompleted ?? false
       }
       return session
     }
@@ -140,7 +143,7 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt'
   },
   pages: {
-    signIn: '/login',
+    signIn: '/owner-login',
   },
   secret: process.env.NEXTAUTH_SECRET,
 }
