@@ -89,8 +89,8 @@ export default function LoginContent() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Guest/Staff Login</h1>
           <p className="text-gray-600 mt-2">Scan QR code to access hotel services</p>
-          <Link href="/owner-login" className="text-sm text-indigo-600 hover:text-indigo-700 mt-2 inline-block">
-            Hotel Owner? Login here →
+          <Link href="/admin/login" className="text-sm text-indigo-600 hover:text-indigo-700 mt-2 inline-block">
+            Hotel Owner or Admin? Login here →
           </Link>
         </div>
 

@@ -25,8 +25,8 @@ export async function middleware(request: NextRequest) {
   // Public routes - no authentication needed
   const publicRoutes = [
     '/login',
-    '/owner-login',
-    '/register',
+    '/admin/login',
+    '/admin/register',
     '/forgot-password',
     '/reset-password',
     '/widget-demo',
@@ -35,8 +35,14 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
   
-  // Onboarding route - accessible only to authenticated users without hotel
-  const isOnboardingRoute = pathname.startsWith('/onboarding')
+  // Admin onboarding route - accessible only to authenticated OWNER users
+  const isAdminOnboardingRoute = pathname.startsWith('/admin/onboarding')
+  
+  // Legacy onboarding route - redirect to /admin/onboarding
+  if (pathname.startsWith('/onboarding')) {
+    const adminOnboardingUrl = new URL('/admin/onboarding', request.url)
+    return NextResponse.redirect(adminOnboardingUrl)
+  }
   
   // Allow public routes and API auth endpoints
   if (isPublicRoute || pathname.startsWith('/api/auth')) {
@@ -63,9 +69,9 @@ export async function middleware(request: NextRequest) {
   
   // Check if user is authenticated
   if (!token || !token.id) {
-    // Not authenticated - redirect to login unless on onboarding page
-    if (isOnboardingRoute) {
-      const loginUrl = new URL('/login', request.url)
+    // Not authenticated - redirect to login unless on admin onboarding page
+    if (isAdminOnboardingRoute) {
+      const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('callbackUrl', pathname)
       return NextResponse.redirect(loginUrl)
     }
@@ -79,20 +85,20 @@ export async function middleware(request: NextRequest) {
     if (userRole === 'OWNER' || userRole === 'owner') {
       if (!hotelId || !onboardingCompleted) {
         // User needs to complete onboarding
-        if (!isOnboardingRoute) {
-          // Redirect to onboarding if trying to access protected routes
-          if (pathname.startsWith('/dashboard') || pathname.startsWith('/profile')) {
-            const onboardingUrl = new URL('/onboarding', request.url)
+        if (!isAdminOnboardingRoute) {
+          // Redirect to admin onboarding if trying to access protected routes
+          if (pathname.startsWith('/dashboard') || pathname.startsWith('/profile') || pathname.startsWith('/admin/dashboard')) {
+            const onboardingUrl = new URL('/admin/onboarding', request.url)
             return NextResponse.redirect(onboardingUrl)
           }
         }
-        // Allow access to onboarding pages
-        if (isOnboardingRoute) {
+        // Allow access to admin onboarding pages
+        if (isAdminOnboardingRoute) {
           return addSecurityHeaders(NextResponse.next(), request)
         }
       } else {
         // User has completed onboarding
-        if (isOnboardingRoute) {
+        if (isAdminOnboardingRoute) {
           // Redirect to dashboard if trying to access onboarding after completion
           const dashboardUrl = new URL('/dashboard', request.url)
           return NextResponse.redirect(dashboardUrl)
@@ -104,6 +110,7 @@ export async function middleware(request: NextRequest) {
   // Protected routes - require authentication
   const protectedRoutes = [
     '/dashboard',
+    '/admin/dashboard',
     '/api/protected',
     '/api/rbac',
     '/api/session',
@@ -112,7 +119,12 @@ export async function middleware(request: NextRequest) {
 
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
-  if (isProtectedRoute) {
+  // Protect /admin/* routes (except login/register which are public)
+  const isAdminRoute = pathname.startsWith('/admin') && 
+    !pathname.startsWith('/admin/login') && 
+    !pathname.startsWith('/admin/register')
+
+  if (isProtectedRoute || isAdminRoute) {
     // Check for valid authentication
     if (!token || !token.id) {
       // Not authenticated - redirect to login
@@ -124,8 +136,11 @@ export async function middleware(request: NextRequest) {
         )
       }
       
-      // UI routes redirect to login
-      const loginUrl = new URL('/login', request.url)
+      // UI routes redirect to appropriate login
+      const loginUrl = new URL(
+        isAdminRoute ? '/admin/login' : '/login',
+        request.url
+      )
       loginUrl.searchParams.set('callbackUrl', pathname)
       return NextResponse.redirect(loginUrl)
     }
@@ -136,14 +151,14 @@ export async function middleware(request: NextRequest) {
     const onboardingCompleted = token.onboardingCompleted as boolean | undefined
 
     if ((userRole === 'OWNER' || userRole === 'owner') && (!hotelId || !onboardingCompleted)) {
-      // OWNER without completed onboarding - redirect to onboarding
+      // OWNER without completed onboarding - redirect to admin onboarding
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
           { error: 'Onboarding required' },
           { status: 403 }
         )
       }
-      const onboardingUrl = new URL('/onboarding', request.url)
+      const onboardingUrl = new URL('/admin/onboarding', request.url)
       return NextResponse.redirect(onboardingUrl)
     }
 
@@ -286,5 +301,14 @@ function addSecurityHeaders(
 
 // Configure which routes use this middleware
 export const config = {
-  matcher: ['/dashboard/:path*', '/profile/:path*', '/api/:path*', '/login', '/owner-login', '/register', '/onboarding/:path*']
+  matcher: [
+    '/dashboard/:path*',
+    '/admin/:path*',
+    '/profile/:path*',
+    '/api/:path*',
+    '/login',
+    '/owner-login',
+    '/register',
+    '/onboarding/:path*'
+  ]
 }
