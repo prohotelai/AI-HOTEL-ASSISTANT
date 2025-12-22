@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { logAuth } from '@/lib/logging'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('ServicesAPI')
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authOptions)
 
     if (!session || !session.user) {
-      logAuth('error', 'ENFORCEMENT: Services endpoint - no session', {})
+      logger.error('ENFORCEMENT: Services endpoint - no session', {})
       return NextResponse.json(
         { error: 'Unauthorized', code: 'NO_SESSION' },
         { status: 401 }
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const { hotelId } = params
 
     if (!hotelId) {
-      logAuth('error', 'ENFORCEMENT: Services endpoint - missing hotelId', { userId })
+      logger.error('ENFORCEMENT: Services endpoint - missing hotelId', { userId })
       return NextResponse.json(
         { error: 'Missing hotelId in request', code: 'MISSING_HOTEL_ID' },
         { status: 400 }
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     })
 
     if (!user || user.hotelId !== hotelId) {
-      logAuth('error', 'ENFORCEMENT: Services endpoint - unauthorized access', {
+      logger.error('ENFORCEMENT: Services endpoint - unauthorized access', {
         userId,
         hotelId,
         userHotelId: user?.hotelId
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     // Only OWNER can configure services
     if (user.role !== 'OWNER') {
-      logAuth('error', 'ENFORCEMENT: Services endpoint - non-owner access', {
+      logger.error('ENFORCEMENT: Services endpoint - non-owner access', {
         userId,
         hotelId,
         role: user.role
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       return serviceConfig
     })
 
-    logAuth('info', 'Services configured successfully', {
+    logger.info('Services configured successfully', {
       hotelId,
       userId,
       services: { aiGuestChat, analyticsDashboard, guestPrivacyMode }
