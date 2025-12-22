@@ -5,18 +5,27 @@ export const runtime = 'nodejs'
  * GET /api/session/me
  * 
  * Get current user session with roles and permissions
+ * Returns user info, assigned roles, and all permissions
+ * 
+ * Error Handling:
+ * - 401: Not authenticated
+ * - 500: Database errors (wrapped in try/catch)
+ * - Comprehensive logging with userId, hotelId, role, endpoint
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserRoles, getUserPermissions } from '@/lib/services/rbac/rbacService'
 import { withAuth, AuthContext } from '@/lib/auth/withAuth'
+import { internalError } from '@/lib/api/errorHandler'
 
 async function handleGetSession(request: NextRequest, ctx: AuthContext) {
   try {
     const userId = ctx.userId
     const hotelId = ctx.hotelId
+    const role = ctx.role
 
     // Get user roles and permissions
+    // DB operations: wrapped in try/catch
     const userRoles = await getUserRoles(userId, hotelId)
     const userPermissions = await getUserPermissions(userId, hotelId)
 
@@ -41,10 +50,10 @@ async function handleGetSession(request: NextRequest, ctx: AuthContext) {
       ),
     })
   } catch (error) {
-    console.error('Error fetching session:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch session' },
-      { status: 500 }
+    return internalError(
+      error,
+      { userId: ctx.userId, hotelId: ctx.hotelId, role: ctx.role, endpoint: '/api/session/me', method: 'GET' },
+      'Failed to fetch session information'
     )
   }
 }

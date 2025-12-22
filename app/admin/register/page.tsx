@@ -13,6 +13,7 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
+    hotelName: '',
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -23,6 +24,23 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
+      // Validate form on client side
+      if (!formData.name.trim()) {
+        throw new Error('Full name is required')
+      }
+      if (!formData.email.trim()) {
+        throw new Error('Email is required')
+      }
+      if (!formData.password) {
+        throw new Error('Password is required')
+      }
+      if (formData.password.length < 8) {
+        throw new Error('Password must be at least 8 characters')
+      }
+      if (!formData.hotelName.trim()) {
+        throw new Error('Hotel name is required')
+      }
+
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,7 +52,10 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Registration failed')
       }
 
-      // Redirect to admin login to authenticate, then they'll be redirected to onboarding
+      const result = await response.json()
+      console.log('Signup successful:', { hotelId: result.hotelId, userId: result.userId })
+
+      // Redirect to admin login, which will then redirect to onboarding
       router.push('/admin/login?registered=true')
     } catch (error: any) {
       setError(error.message || 'An error occurred. Please try again.')
@@ -88,6 +109,7 @@ export default function RegisterPage() {
                 value={formData.name}
                 onChange={handleChange}
                 className="mt-1"
+                placeholder="Your name"
               />
             </div>
 
@@ -104,6 +126,7 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 className="mt-1"
+                placeholder="you@example.com"
               />
             </div>
 
@@ -122,6 +145,22 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 className="mt-1"
                 placeholder="Minimum 8 characters"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="hotelName" className="block text-sm font-medium text-gray-700">
+                Hotel name
+              </label>
+              <Input
+                id="hotelName"
+                name="hotelName"
+                type="text"
+                required
+                value={formData.hotelName}
+                onChange={handleChange}
+                className="mt-1"
+                placeholder="Your hotel name"
               />
             </div>
           </div>

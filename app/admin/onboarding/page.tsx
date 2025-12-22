@@ -4,40 +4,41 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import OnboardingLayout from '@/components/onboarding/OnboardingLayout'
-import WelcomeStep from '@/components/onboarding/steps/WelcomeStep'
-import ProfileStep from '@/components/onboarding/steps/ProfileStep'
-import WebsiteScanStep from '@/components/onboarding/steps/WebsiteScanStep'
-import KnowledgeBaseStep from '@/components/onboarding/steps/KnowledgeBaseStep'
-import WidgetStep from '@/components/onboarding/steps/WidgetStep'
-import IntegrationsStep from '@/components/onboarding/steps/IntegrationsStep'
-import InviteStaffStep from '@/components/onboarding/steps/InviteStaffStep'
-import TestChatStep from '@/components/onboarding/steps/TestChatStep'
+import HotelDetailsStep from '@/components/onboarding/steps/HotelDetailsStep'
+import RoomConfigStep from '@/components/onboarding/steps/RoomConfigStep'
+import ServicesSetupStep from '@/components/onboarding/steps/ServicesSetupStep'
 import FinishStep from '@/components/onboarding/steps/FinishStep'
 
 export const dynamic = 'force-dynamic'
 
-type OnboardingStep =
-  | 'welcome'
-  | 'profile'
-  | 'website-scan'
-  | 'knowledge-base'
-  | 'widget'
-  | 'integrations'
-  | 'invite-staff'
-  | 'test'
-  | 'finish'
+export interface HotelData {
+  id: string
+  name: string
+  address: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+}
+
+type OnboardingStep = 'hotel-details' | 'room-config' | 'services-setup' | 'finish'
 
 export default function OnboardingPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome')
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('hotel-details')
   const [completedSteps, setCompletedSteps] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [hotelData, setHotelData] = useState<HotelData | null>(null)
+  const [loadError, setLoadError] = useState('')
   
-  // Get hotelId from session (may be null initially)
+  // Get hotelId and role from session (requires authentication)
   const hotelId = (session?.user as any)?.hotelId as string | null
+  const userRole = (session?.user as any)?.role as string | null
+  const onboardingCompleted = (session?.user as any)?.onboardingCompleted as boolean | null
 
+  // Load hotel data and validate access
   useEffect(() => {
+    // Check authentication status
     if (status === 'loading') return
 
     if (status === 'unauthenticated') {
@@ -45,24 +46,56 @@ export default function OnboardingPage() {
       return
     }
 
+    // Validate session data
     if (status === 'authenticated' && session?.user) {
-      const user = session.user as any
+      // Enforce OWNER role - only hotel admin owners can access
+      if (userRole !== 'OWNER' && userRole !== 'owner') {
+        console.warn(`Unauthorized onboarding access: user role is ${userRole}, requires OWNER`)
+        router.push('/403')
+        return
+      }
 
-      // If user already completed onboarding, redirect to dashboard
-      if (user.hotelId && user.onboardingCompleted) {
+      // Redirect if already completed onboarding
+      if (onboardingCompleted) {
         router.push('/dashboard')
         return
       }
 
-      // If user is not OWNER, redirect to appropriate page
-      if (user.role !== 'OWNER' && user.role !== 'owner') {
-        router.push('/dashboard')
+      // Load hotel data using hotelId from auth context
+      if (!hotelId) {
+        setLoadError('No hotel found. Please contact support.')
+        setLoading(false)
         return
       }
 
+      loadHotelData(hotelId)
+    }
+  }, [session, status, hotelId, userRole, onboardingCompleted, router])
+
+  /**
+   * Load hotel data from server (bound to authenticated user's hotelId)
+   * This ensures we never ask for hotel name again - it's already created at signup
+   */
+  async function loadHotelData(hotelId: string) {
+    try {
+      const res = await fetch(`/api/hotels/${hotelId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!res.ok) {
+        throw new Error(`Failed to load hotel data: ${res.status}`)
+      }
+
+      const data = await res.json()
+      setHotelData(data)
+    } catch (error: any) {
+      console.error('Failed to load hotel data:', error)
+      setLoadError(error.message || 'Failed to load hotel data')
+    } finally {
       setLoading(false)
     }
-  }, [session, status, router])
+  }
 
   const handleStepComplete = (step: string) => {
     if (!completedSteps.includes(step)) {
@@ -72,14 +105,9 @@ export default function OnboardingPage() {
 
   const handleNext = () => {
     const steps: OnboardingStep[] = [
-      'welcome',
-      'profile',
-      'website-scan',
-      'knowledge-base',
-      'widget',
-      'integrations',
-      'invite-staff',
-      'test',
+      'hotel-details',
+      'room-config',
+      'services-setup',
       'finish',
     ]
     const currentIndex = steps.indexOf(currentStep)
@@ -90,14 +118,9 @@ export default function OnboardingPage() {
 
   const handleBack = () => {
     const steps: OnboardingStep[] = [
-      'welcome',
-      'profile',
-      'website-scan',
-      'knowledge-base',
-      'widget',
-      'integrations',
-      'invite-staff',
-      'test',
+      'hotel-details',
+      'room-config',
+      'services-setup',
       'finish',
     ]
     const currentIndex = steps.indexOf(currentStep)
@@ -110,12 +133,33 @@ export default function OnboardingPage() {
     setCurrentStep(step as OnboardingStep)
   }
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading your hotel setup...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (loadError || !hotelData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Setup Error</h2>
+          <p className="text-gray-600 mb-6">
+            {loadError || 'Unable to load your hotel data. Please refresh the page.'}
+          </p>
+          <button
+            onClick={() => router.push('/admin/login')}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Return to Login
+          </button>
         </div>
       </div>
     )
@@ -127,69 +171,32 @@ export default function OnboardingPage() {
       completedSteps={completedSteps}
       onStepChange={handleStepChange}
     >
-      {currentStep === 'welcome' && (
-        <WelcomeStep
-          onComplete={() => handleStepComplete('welcome')}
+      {currentStep === 'hotel-details' && hotelData && (
+        <HotelDetailsStep
+          hotelData={hotelData}
+          onComplete={() => handleStepComplete('hotel-details')}
           onNext={handleNext}
         />
       )}
-      {currentStep === 'profile' && (
-        <ProfileStep
-          onComplete={() => handleStepComplete('profile')}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
-      )}
-      {currentStep === 'website-scan' && hotelId && (
-        <WebsiteScanStep
-          hotelId={hotelId}
-          onComplete={() => handleStepComplete('website-scan')}
+      {currentStep === 'room-config' && hotelData && (
+        <RoomConfigStep
+          hotelId={hotelData.id}
+          onComplete={() => handleStepComplete('room-config')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'knowledge-base' && hotelId && (
-        <KnowledgeBaseStep
-          hotelId={hotelId}
-          onComplete={() => handleStepComplete('knowledge-base')}
+      {currentStep === 'services-setup' && hotelData && (
+        <ServicesSetupStep
+          hotelId={hotelData.id}
+          onComplete={() => handleStepComplete('services-setup')}
           onNext={handleNext}
           onBack={handleBack}
         />
       )}
-      {currentStep === 'widget' && hotelId && (
-        <WidgetStep
-          hotelId={hotelId}
-          onComplete={() => handleStepComplete('widget')}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
-      )}
-      {currentStep === 'integrations' && hotelId && (
-        <IntegrationsStep
-          hotelId={hotelId}
-          onComplete={() => handleStepComplete('integrations')}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
-      )}
-      {currentStep === 'invite-staff' && hotelId && (
-        <InviteStaffStep
-          hotelId={hotelId}
-          onComplete={() => handleStepComplete('invite-staff')}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
-      )}
-      {currentStep === 'test' && hotelId && (
-        <TestChatStep
-          hotelId={hotelId}
-          onComplete={() => handleStepComplete('test')}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
-      )}
-      {currentStep === 'finish' && (
+      {currentStep === 'finish' && hotelData && (
         <FinishStep
+          hotelId={hotelData.id}
           onComplete={() => handleStepComplete('finish')}
         />
       )}

@@ -1,0 +1,164 @@
+/**
+ * Admin Signup Service
+ * 
+ * Handles hotel admin registration with atomic transaction:
+ * - Creates User (role: OWNER)
+ * - Creates Hotel entity
+ * - Links user to hotel
+ * - Generates unique hotelId in format H-XXXXX
+ * 
+ * All-or-nothing: If any step fails, entire transaction rolls back
+ */
+
+import { prisma } from '@/lib/prisma'
+import { SystemRole, SubscriptionPlan, SubscriptionStatus } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+import { nanoid } from 'nanoid'
+
+export interface AdminSignupInput {
+  name: string
+  email: string
+  password: string
+  hotelName: string
+}
+
+export interface AdminSignupResult {
+  success: boolean
+  userId: string
+  hotelId: string
+  email: string
+  onboardingRequired: boolean
+}
+
+/**
+ * Generate unique hotelId
+ * Format: H-{5 random chars} (e.g., H-AX2K9)
+ */
+function generateHotelId(): string {
+  const randomPart = nanoid(5).toUpperCase()
+  return `H-${randomPart}`
+}
+
+/**
+ * Create hotel admin account with hotel entity in a single transaction
+ * 
+ * Validation:
+ * - Email must be unique
+ * - Password must be >= 8 chars
+ * - Hotel name must not be empty
+ * 
+ * On success:
+ * - User.hotelId set to new hotel's ID
+ * - User.role set to OWNER
+ * - User.onboardingCompleted = false (wizard required)
+ * 
+ * On failure:
+ * - Entire transaction rolls back
+ * - No orphaned users or hotels created
+ */
+export async function createHotelAdminSignup(
+  input: AdminSignupInput
+): Promise<AdminSignupResult> {
+  // Validate inputs
+  if (!input.email?.trim() || !input.password || !input.hotelName?.trim()) {
+    throw new Error('Email, password, and hotel name are required')
+  }
+
+  if (input.password.length < 8) {
+    throw new Error('Password must be at least 8 characters')
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(input.email)) {
+    throw new Error('Invalid email format')
+  }
+
+  const emailLower = input.email.toLowerCase()
+
+  // Check if email already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email: emailLower }
+  })
+
+  if (existingUser) {
+    throw new Error('An account with this email already exists')
+  }
+
+  // Hash password with bcrypt cost 12 (stronger for admin)
+  const hashedPassword = await bcrypt.hash(input.password, 12)
+
+  // Generate unique hotel ID
+  let hotelId = generateHotelId()
+  
+  // Ensure uniqueness (extremely rare collision, but be safe)
+  let existingHotel = await prisma.hotel.findUnique({
+    where: { id: hotelId }
+  })
+  
+  while (existingHotel) {
+    hotelId = generateHotelId()
+    existingHotel = await prisma.hotel.findUnique({
+      where: { id: hotelId }
+    })
+  }
+
+  // Create user and hotel in atomic transaction
+  // If hotel creation fails, user creation rolls back
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Create Hotel
+    const hotel = await tx.hotel.create({
+      data: {
+        id: hotelId,
+        name: input.hotelName.trim(),
+        slug: generateSlug(input.hotelName),
+        // Set default plan to STARTER
+        subscriptionPlan: SubscriptionPlan.STARTER,
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+      }
+    })
+
+    // 2. Create User linked to Hotel
+    const user = await tx.user.create({
+      data: {
+        name: input.name?.trim() || null,
+        email: emailLower,
+        password: hashedPassword,
+        role: SystemRole.OWNER,
+        hotelId: hotel.id,
+        onboardingCompleted: false,
+      }
+    })
+
+    return { user, hotel }
+  })
+
+  console.log('Hotel admin signup successful:', {
+    userId: result.user.id,
+    hotelId: result.hotel.id,
+    email: result.user.email,
+    hotelName: result.hotel.name,
+  })
+
+  return {
+    success: true,
+    userId: result.user.id,
+    hotelId: result.hotel.id,
+    email: result.user.email,
+    onboardingRequired: true,
+  }
+}
+
+/**
+ * Generate URL-friendly slug from hotel name
+ * Example: "Sunset Beach Hotel" → "sunset-beach-hotel"
+ */
+function generateSlug(hotelName: string): string {
+  return hotelName
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}

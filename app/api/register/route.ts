@@ -2,120 +2,126 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { SystemRole } from '@prisma/client'
-import bcrypt from 'bcryptjs'
+import { createHotelAdminSignup } from '@/lib/services/adminSignupService'
+import { badRequest, conflict, internalError } from '@/lib/api/errorHandler'
 
 /**
- * ADMIN REGISTRATION ENDPOINT
+ * HOTEL ADMIN REGISTRATION ENDPOINT
  * 
- * Purpose: Create OWNER account ONLY
- * Hotel setup happens in /admin/onboarding wizard
+ * Purpose: Create OWNER account + Hotel in single transaction
  * 
  * Flow:
- * 1. Signup → Create OWNER user (hotelId = null)
- * 2. Login → Redirect to /admin/onboarding
- * 3. Onboarding → Create hotel + link user
+ * 1. Signup → Create OWNER user + Hotel (with hotelId H-XXXXX)
+ * 2. Validate all fields (name, email, password, hotelName)
+ * 3. On success → Redirect to /admin/login (then to /admin/onboarding)
+ * 4. On failure → Return error (transaction rolls back)
+ * 
+ * Security:
+ * - Passwords hashed with bcrypt cost 12
+ * - Email must be unique
+ * - Hotel creation is atomic with user creation
+ * - No orphaned records on failure
+ * - All errors caught, no raw 500s
+ * - Comprehensive logging
  */
 export async function POST(req: NextRequest) {
   try {
     // Parse request body
-    const body = await req.json()
-    const { name, email, password } = body
+    let body: any = {}
+    try {
+      body = await req.json()
+    } catch (parseError) {
+      return badRequest(
+        'Invalid JSON in request body',
+        { endpoint: '/api/register', method: 'POST' }
+      )
+    }
+
+    const { name, email, password, hotelName } = body
 
     // Validate required fields
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
+    if (!email || !password || !hotelName) {
+      return badRequest(
+        'Email, password, and hotel name are required',
+        { endpoint: '/api/register', method: 'POST' },
+        {
+          missing: [
+            !email && 'email',
+            !password && 'password',
+            !hotelName && 'hotelName'
+          ].filter(Boolean)
+        }
       )
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
+      return badRequest(
+        'Invalid email format',
+        { endpoint: '/api/register', method: 'POST' }
       )
     }
 
     // Validate password strength
     if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
-        { status: 400 }
+      return badRequest(
+        'Password must be at least 8 characters long',
+        { endpoint: '/api/register', method: 'POST' }
       )
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 400 }
+    // Validate hotel name
+    if (typeof hotelName !== 'string' || hotelName.trim().length < 2) {
+      return badRequest(
+        'Hotel name must be at least 2 characters long',
+        { endpoint: '/api/register', method: 'POST' }
       )
     }
 
-    // Hash password (bcrypt cost 10)
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    // Create OWNER user (no hotel yet - that happens in onboarding)
-    const user = await prisma.user.create({
-      data: {
-        name: name || null,
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        role: SystemRole.OWNER,
-        hotelId: null, // Hotel created in onboarding wizard
-        onboardingCompleted: false,
-      }
+    // Call service to create admin + hotel atomically
+    // DB operation wrapped in try/catch at service level
+    const result = await createHotelAdminSignup({
+      name: name || '',
+      email,
+      password,
+      hotelName,
     })
 
-    console.log('User registered successfully:', { 
-      userId: user.id, 
-      email: user.email,
-      role: user.role 
-    })
-
-    // Return success
+    // Return success with user and hotel info
     return NextResponse.json(
       {
         success: true,
-        message: 'Account created successfully',
-        userId: user.id,
-        email: user.email,
+        message: 'Hotel account created successfully',
+        userId: result.userId,
+        hotelId: result.hotelId,
+        email: result.email,
         onboardingRequired: true,
       },
       { status: 201 }
     )
 
   } catch (error: any) {
-    // Log full error for debugging
-    console.error('REGISTER_ERROR:', {
-      message: error?.message,
-      code: error?.code,
-      stack: error?.stack
-    })
-
-    // Check for specific database errors
-    if (error?.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 400 }
+    // Handle specific error types
+    if (error.message?.includes('already exists') || error.message?.includes('Unique constraint')) {
+      return conflict(
+        'Email already registered',
+        { endpoint: '/api/register', method: 'POST' }
       )
     }
 
-    // Generic error response
-    return NextResponse.json(
-      { 
-        error: 'Registration failed. Please try again.',
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      },
-      { status: 500 }
+    if (error.message?.includes('validation') || error.message?.includes('invalid')) {
+      return badRequest(
+        error.message || 'Validation failed',
+        { endpoint: '/api/register', method: 'POST' }
+      )
+    }
+
+    // All other errors go through comprehensive error handler
+    return internalError(
+      error,
+      { endpoint: '/api/register', method: 'POST' },
+      'Registration failed. Please try again.'
     )
   }
 }

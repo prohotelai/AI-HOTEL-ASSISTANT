@@ -2,19 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 /**
- * SAFE Middleware for Multi-Tenant Auth System
- * 
- * Critical Rules:
- * - Public routes MUST bypass all auth checks
- * - Never access session.user without null checks
- * - Never throw errors - return safe defaults
- * - Staff/Guest validation happens in API routes (not middleware)
- * 
+ * Authentication Middleware for Multi-Tenant System
+ *
  * Architecture:
- * - Admin: NextAuth JWT tokens
+ * - Admin/Owner: NextAuth JWT tokens
  * - Staff: Custom session tokens (validated in API routes)
  * - Guest: Custom session tokens (validated in API routes)
+ *
+ * Rules:
+ * 1. Public routes bypass all auth checks
+ * 2. Dashboard routes require auth + role validation
+ * 3. No automatic redirects for unauthenticated users
+ * 4. Return 401/403 errors (not 500)
+ * 5. Log all auth failures
+ * 6. Never depend on hotelId before auth
  */
+
+/**
+ * Logger utility for middleware
+ */
+function logAuth(
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  context?: Record<string, any>
+) {
+  const timestamp = new Date().toISOString()
+  const contextStr = context ? JSON.stringify(context) : ''
+  console.log(`[${timestamp}] [AUTH-${level.toUpperCase()}] ${message} ${contextStr}`)
+}
 
 /**
  * Safely extract NextAuth session token
@@ -22,15 +37,75 @@ import { getToken } from 'next-auth/jwt'
  */
 async function getSessionSafely(request: NextRequest) {
   try {
-    const token = await getToken({ 
+    const token = await getToken({
       req: request,
-      secret: process.env.NEXTAUTH_SECRET 
+      secret: process.env.NEXTAUTH_SECRET
     })
     return token
   } catch (error) {
-    console.error('Session extraction error:', error)
+    logAuth('warn', 'Failed to extract session token', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
     return null
   }
+}
+
+/**
+ * Route classification helpers
+ */
+function isPublicRoute(pathname: string): boolean {
+  // Rule 1: Allow public access to these routes
+  const publicRoutes = [
+    '/signup',           // Hotel admin signup
+    '/access',           // QR role selection
+    '/staff/activate',   // Staff activation
+    '/guest/access',     // Guest identification
+    '/admin/login',      // Admin login
+    '/admin/register',   // Admin register
+    '/staff/password',   // Staff password reset
+    '/guest/identify',   // Guest alternative identify
+    '/forgot-password',  // Password recovery
+    '/reset-password',   // Password reset
+    '/widget-demo',      // Widget demo
+    '/403',              // Error pages
+    '/404',
+    '/500',
+    '/_next',            // Next.js internal
+    '/favicon.ico'       // Favicon
+  ]
+
+  return publicRoutes.some(route => pathname.startsWith(route))
+}
+
+function isDashboardRoute(pathname: string): boolean {
+  // Rule 2: Dashboard routes require auth + role
+  const dashboardRoutes = [
+    '/dashboard',
+    '/admin/dashboard',
+    '/admin/onboarding',
+    '/admin/',  // All admin routes
+    '/profile',
+    '/settings'
+  ]
+
+  return dashboardRoutes.some(route => pathname.startsWith(route))
+}
+
+function isApiRoute(pathname: string): boolean {
+  return pathname.startsWith('/api/')
+}
+
+function isPublicApiRoute(pathname: string): boolean {
+  const publicApiRoutes = [
+    '/api/auth',         // NextAuth
+    '/api/register',     // Hotel signup
+    '/api/qr',           // QR access
+    '/api/guest/access', // Guest session
+    '/api/guest/validate',
+    '/api/guest/session/create'
+  ]
+
+  return publicApiRoutes.some(route => pathname.startsWith(route))
 }
 
 export async function middleware(request: NextRequest) {
@@ -38,202 +113,226 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
     // ===== 1. PUBLIC ROUTES - IMMEDIATE BYPASS =====
-    // These routes MUST be accessible without authentication
-    const publicRoutes = [
-      '/admin/login',
-      '/admin/register',
-      '/signup',
-      '/login',
-      '/staff/access',
-      '/staff/password',
-      '/guest/access',
-      '/guest/identify',
-      '/forgot-password',
-      '/reset-password',
-      '/widget-demo',
-      '/api/auth',
-      '/403',
-      '/500',
-      '/404',
-      '/_next',
-      '/favicon.ico'
-    ]
-
-    // Check if current path is public
-    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
-    
-    if (isPublicRoute) {
+    // Rule 1: These routes are always accessible
+    if (isPublicRoute(pathname) || isPublicApiRoute(pathname)) {
+      logAuth('info', 'Public route access', { pathname })
       return NextResponse.next()
     }
 
-    // ===== 2. STAFF ROUTES - TOKEN CHECK ONLY =====
-    // Full validation happens in API routes (Prisma not available in Edge Runtime)
-    if (pathname.startsWith('/staff/')) {
-      const staffToken = request.cookies.get('staff-session')?.value || 
-                        request.headers.get('authorization')?.replace('Bearer ', '')
-      
+    // ===== 2. STAFF/GUEST ROUTES - CUSTOM TOKEN CHECK =====
+    // Note: Full validation happens in API routes (no Prisma in Edge Runtime)
+
+    // Staff routes: Check for staff-session cookie or Bearer token
+    if (pathname.startsWith('/staff/chat') || pathname.startsWith('/staff/')) {
+      const staffToken =
+        request.cookies.get('staff-session')?.value ||
+        request.headers.get('authorization')?.replace('Bearer ', '')
+
       if (!staffToken) {
-        return NextResponse.redirect(new URL('/staff/access', request.url))
+        logAuth('warn', 'Staff route accessed without token', { pathname })
+        // Rule 3: Do NOT redirect - return 401
+        return NextResponse.json(
+          {
+            error: 'Unauthorized',
+            message: 'Staff session token required. Please scan the QR code.'
+          },
+          { status: 401 }
+        )
       }
-      
-      // Token exists - let through, API routes will validate
+
+      logAuth('info', 'Staff route access granted', { pathname })
       return NextResponse.next()
     }
 
-    // ===== 3. GUEST ROUTES - TOKEN CHECK ONLY =====
-    if (pathname.startsWith('/guest/')) {
-      const guestToken = request.cookies.get('guest-session')?.value || 
-                        request.headers.get('authorization')?.replace('Bearer ', '')
-      
+    // Guest routes: Check for guest-session or sessionId
+    if (pathname.startsWith('/guest/chat') || pathname.startsWith('/guest/')) {
+      const guestToken =
+        request.cookies.get('guest-session')?.value ||
+        request.headers.get('authorization')?.replace('Bearer ', '') ||
+        request.nextUrl.searchParams.get('sessionId')
+
       if (!guestToken) {
-        return NextResponse.redirect(new URL('/guest/access', request.url))
+        logAuth('warn', 'Guest route accessed without token', { pathname })
+        // Rule 3: Do NOT redirect - return 401
+        return NextResponse.json(
+          {
+            error: 'Unauthorized',
+            message: 'Guest session token required. Please scan the QR code.'
+          },
+          { status: 401 }
+        )
       }
-      
-      // Token exists - let through, API routes will validate
+
+      logAuth('info', 'Guest route access granted', { pathname })
       return NextResponse.next()
     }
 
-    // ===== 4. ADMIN ROUTES - NEXTAUTH VALIDATION =====
-    
-    // Allow QR universal API (no auth required)
-    if (pathname.startsWith('/api/qr/universal')) {
-      return NextResponse.next()
-    }
+    // ===== 3. DASHBOARD ROUTES - NEXTAUTH VALIDATION =====
+    // Rule 2: Requires both authentication AND role matching
 
-    // Get session safely (never throws)
-    const session = await getSessionSafely(request)
+    if (isDashboardRoute(pathname)) {
+      const session = await getSessionSafely(request)
 
-    // Protected routes require authentication
-    const protectedRoutes = [
-      '/dashboard',
-      '/admin/dashboard',
-      '/admin/onboarding',
-      '/profile',
-      '/settings',
-      '/api/protected',
-      '/api/rbac',
-      '/api/session'
-    ]
+      // No session = 401 Unauthorized
+      if (!session || !session.sub) {
+        logAuth('warn', 'Dashboard route accessed without session', {
+          pathname,
+          hasSession: !!session
+        })
 
-    const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
-    const isAdminRoute = pathname.startsWith('/admin/') && 
-                         !pathname.startsWith('/admin/login') && 
-                         !pathname.startsWith('/admin/register')
-    const isApiRoute = pathname.startsWith('/api/')
-
-    // Check if route requires authentication
-    if (isProtectedRoute || isAdminRoute) {
-      // No session - redirect to login
-      if (!session || !session.id) {
-        // Prevent redirect loop
-        if (pathname === '/admin/login') {
-          return NextResponse.next()
-        }
-
-        // API routes return 401
-        if (isApiRoute) {
+        // Rule 4: Return 401/403, not 500
+        if (isApiRoute(pathname)) {
           return NextResponse.json(
-            { error: 'Unauthorized' },
+            {
+              error: 'Unauthorized',
+              message: 'Authentication required'
+            },
             { status: 401 }
           )
         }
-        
-        // UI routes redirect to login
-        const loginUrl = new URL('/admin/login', request.url)
-        loginUrl.searchParams.set('callbackUrl', pathname)
-        return NextResponse.redirect(loginUrl)
+
+        // Rule 3: For UI routes, return 401 (client decides redirect)
+        // DO NOT automatically redirect
+        return NextResponse.json(
+          {
+            error: 'Unauthorized',
+            message: 'Please log in to access this page'
+          },
+          { status: 401 }
+        )
       }
 
-      // Session exists - check onboarding for OWNER role
+      // Extract user info from session
       const userRole = (session.role as string)?.toUpperCase() || 'GUEST'
       const hotelId = session.hotelId as string | null
       const onboardingCompleted = session.onboardingCompleted as boolean | undefined
 
-      // OWNER without completed onboarding must complete it first
-      if (userRole === 'OWNER' && (!hotelId || !onboardingCompleted)) {
-        const isOnboardingRoute = pathname.startsWith('/admin/onboarding')
-        
-        if (!isOnboardingRoute) {
-          // Redirect to onboarding
-          if (isApiRoute) {
-            return NextResponse.json(
-              { error: 'Onboarding required' },
-              { status: 403 }
-            )
-          }
-          const onboardingUrl = new URL('/admin/onboarding', request.url)
-          return NextResponse.redirect(onboardingUrl)
-        }
-      }
+      logAuth('info', 'Dashboard route session check', {
+        pathname,
+        userId: session.sub,
+        userRole,
+        hotelId
+      })
 
-      // Completed onboarding - redirect away from onboarding page
-      if (userRole === 'OWNER' && hotelId && onboardingCompleted) {
+      // Rule 2: Check role-based access for admin routes
+      if (pathname.startsWith('/admin/')) {
+        // Allow /admin/onboarding for OWNER without hotelId
         if (pathname.startsWith('/admin/onboarding')) {
-          const dashboardUrl = new URL('/dashboard', request.url)
-          return NextResponse.redirect(dashboardUrl)
-        }
-      }
-
-      // Check role-based access for admin routes
-      if (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/onboarding')) {
-        if (userRole !== 'OWNER' && userRole !== 'ADMIN' && userRole !== 'MANAGER') {
-          if (isApiRoute) {
+          if (userRole !== 'OWNER') {
+            logAuth('warn', 'Non-owner accessed onboarding', {
+              pathname,
+              userRole
+            })
             return NextResponse.json(
-              { error: 'Access denied' },
+              {
+                error: 'Forbidden',
+                message: 'Only hotel owners can access onboarding'
+              },
               { status: 403 }
             )
           }
-          return NextResponse.redirect(new URL('/403', request.url))
+          return NextResponse.next()
         }
+
+        // All other admin routes require OWNER, ADMIN, or MANAGER
+        const allowedRoles = ['OWNER', 'ADMIN', 'MANAGER']
+        if (!allowedRoles.includes(userRole)) {
+          logAuth('warn', 'Insufficient role for admin route', {
+            pathname,
+            userRole,
+            requiredRoles: allowedRoles
+          })
+
+          return NextResponse.json(
+            {
+              error: 'Forbidden',
+              message: 'Admin access required'
+            },
+            { status: 403 }
+          )
+        }
+
+        // Verify hotelId exists (required for all dashboard operations)
+        if (!hotelId) {
+          logAuth('error', 'Admin route missing hotelId', {
+            pathname,
+            userId: session.sub
+          })
+
+          return NextResponse.json(
+            {
+              error: 'Forbidden',
+              message: 'No hotel association found'
+            },
+            { status: 403 }
+          )
+        }
+
+        return NextResponse.next()
       }
-    }
 
-    // Legacy route redirects
-    if (pathname === '/owner-login') {
-      return NextResponse.redirect(new URL('/admin/login', request.url))
-    }
-    if (pathname === '/register') {
-      return NextResponse.redirect(new URL('/admin/register', request.url))
-    }
-    if (pathname === '/onboarding') {
-      return NextResponse.redirect(new URL('/admin/onboarding', request.url))
-    }
+      // Other dashboard routes (/dashboard, /profile, /settings)
+      if (!hotelId) {
+        logAuth('error', 'Dashboard route missing hotelId', {
+          pathname,
+          userId: session.sub
+        })
 
-    // Allow through
-    return NextResponse.next()
+        return NextResponse.json(
+          {
+            error: 'Forbidden',
+            message: 'No hotel association found'
+          },
+          { status: 403 }
+        )
+      }
 
-  } catch (error) {
-    // NEVER throw in middleware - log and allow through for public routes
-    console.error('Middleware error:', error)
-    
-    const { pathname } = request.nextUrl
-    
-    // Allow public routes even on error
-    const emergencyPublicRoutes = [
-      '/admin/login',
-      '/admin/register',
-      '/signup',
-      '/login',
-      '/staff/access',
-      '/guest/access',
-      '/api/auth'
-    ]
-    
-    const isEmergencyPublic = emergencyPublicRoutes.some(route => pathname.startsWith(route))
-    
-    if (isEmergencyPublic) {
+      logAuth('info', 'Dashboard route access granted', {
+        pathname,
+        userRole,
+        hotelId
+      })
+
       return NextResponse.next()
     }
-    
-    // For protected routes, redirect to login on error
-    if (pathname.startsWith('/api/')) {
+
+    // ===== 4. ALL OTHER ROUTES - ALLOW THROUGH =====
+    logAuth('info', 'Unclassified route access', { pathname })
+    return NextResponse.next()
+  } catch (error) {
+    // Rule 5: Log middleware failures with context
+    const { pathname } = request.nextUrl
+    logAuth('error', 'Middleware error', {
+      pathname,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
+
+    // Emergency fallback: Allow public routes even on error
+    if (isPublicRoute(pathname) || isPublicApiRoute(pathname)) {
+      logAuth('info', 'Error recovery: allowing public route', { pathname })
+      return NextResponse.next()
+    }
+
+    // Rule 4: Return 500 for protected routes on error
+    if (isApiRoute(pathname)) {
       return NextResponse.json(
-        { error: 'Internal server error' },
+        {
+          error: 'Internal Server Error',
+          message: 'Authentication check failed'
+        },
         { status: 500 }
       )
     }
-    
-    return NextResponse.redirect(new URL('/admin/login', request.url))
+
+    // UI routes: Return error (do not redirect)
+    return NextResponse.json(
+      {
+        error: 'Internal Server Error',
+        message: 'An unexpected error occurred'
+      },
+      { status: 500 }
+    )
   }
 }
 

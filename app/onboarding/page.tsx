@@ -188,8 +188,9 @@ export default function OnboardingPage() {
           onBack={handleBack}
         />
       )}
-      {currentStep === 'finish' && (
+      {currentStep === 'finish' && hotelId && (
         <FinishStep
+          hotelId={hotelId}
           onComplete={() => handleStepComplete('finish')}
         />
       )}

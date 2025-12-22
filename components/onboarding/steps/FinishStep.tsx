@@ -11,24 +11,26 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
 interface FinishStepProps {
+  hotelId: string
   onComplete: () => void
 }
 
-export default function FinishStep({ onComplete }: FinishStepProps) {
+export default function FinishStep({ hotelId, onComplete }: FinishStepProps) {
   const router = useRouter()
   const { data: session, update } = useSession()
-  const hotelId = (session?.user as any)?.hotelId as string
   const [activating, setActivating] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleActivate() {
     setActivating(true)
+    setError('')
 
     try {
       if (!hotelId) {
         throw new Error('No hotel context found')
       }
 
-      // Mark onboarding as complete and activate hotel
+      // Mark onboarding as complete and set hotel status to COMPLETED
       const res = await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,10 +40,11 @@ export default function FinishStep({ onComplete }: FinishStepProps) {
       })
 
       if (!res.ok) {
-        throw new Error('Failed to complete onboarding')
+        const errData = await res.json()
+        throw new Error(errData.error || 'Failed to complete onboarding')
       }
 
-      // Update session
+      // Update session to reflect onboarding completion
       await update()
       
       onComplete()
@@ -51,16 +54,17 @@ export default function FinishStep({ onComplete }: FinishStepProps) {
         router.push('/dashboard')
         router.refresh()
       }, 1500)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to activate:', error)
-    } finally {
+      setError(error.message || 'Failed to complete onboarding. Please try again.')
       setActivating(false)
     }
   }
 
   const completedFeatures = [
     { label: 'Hotel profile configured', icon: CheckCircle2 },
-    { label: 'Chat widget generated', icon: CheckCircle2 },
+    { label: 'Rooms set up', icon: CheckCircle2 },
+    { label: 'Services enabled', icon: CheckCircle2 },
     { label: 'AI assistant ready', icon: Sparkles },
   ]
 
@@ -79,15 +83,15 @@ export default function FinishStep({ onComplete }: FinishStepProps) {
         <CheckCircle2 className="w-12 h-12" />
       </motion.div>
 
-      <h2 className="text-4xl font-bold text-brand-text mb-4">
+      <h2 className="text-4xl font-bold text-gray-900 mb-4">
         You&apos;re All Set!
       </h2>
-      <p className="text-xl text-brand-muted mb-12 max-w-2xl mx-auto">
-        Your AI Hotel Assistant is configured and ready to help your guests
+      <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
+        Your hotel is configured and your AI assistant is ready to help guests 24/7
       </p>
 
-      <div className="bg-white rounded-xl p-8 shadow-sm border border-brand-border mb-8">
-        <h3 className="text-lg font-semibold text-brand-text mb-6">
+      <div className="bg-white rounded-lg p-8 shadow-sm border border-gray-200 mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6">
           What You&apos;ve Completed
         </h3>
         <div className="space-y-4">
@@ -97,10 +101,10 @@ export default function FinishStep({ onComplete }: FinishStepProps) {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 + index * 0.1 }}
-              className="flex items-center gap-3"
+              className="flex items-center justify-center gap-3"
             >
               <feature.icon className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <span className="text-brand-text">{feature.label}</span>
+              <span className="text-gray-700">{feature.label}</span>
             </motion.div>
           ))}
         </div>

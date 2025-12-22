@@ -2,8 +2,16 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /**
- * API - تغيير كلمة المرور للموظفين
- * Staff Password Change API
+ * API - Staff Password Change
+ * 
+ * POST /api/auth/staff/change-password
+ * Change password for authenticated staff member
+ * 
+ * Error Handling:
+ * - 400: Invalid input (missing fields, password requirements)
+ * - 401: Unauthenticated (handled by withAuth)
+ * - 500: Database errors (wrapped in try/catch)
+ * - Comprehensive logging with userId, hotelId, endpoint
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,51 +19,79 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { withAuth } from '@/lib/middleware/rbac'
 import { changeStaffPassword, setInitialPassword } from '@/lib/auth/staffAuth'
+import { badRequest, internalError } from '@/lib/api/errorHandler'
 
 /**
  * POST /api/auth/staff/change-password
- * تغيير كلمة المرور (عادي)
+ * Change password (with current password verification)
  */
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: NextRequest, ctx: any) => {
   try {
     const session = await getServerSession(authOptions)
     const user = session?.user as any
+    const userId = user?.id
 
-    const body = await req.json()
-    const { currentPassword, newPassword } = body
-
-    if (!currentPassword || !newPassword) {
-      return NextResponse.json(
-        { 
-          error: 'كلمة المرور الحالية والجديدة مطلوبتان',
-          message: 'Current password and new password are required'
-        },
-        { status: 400 }
+    // Parse request body with error handling
+    let body: any = {}
+    try {
+      body = await req.json()
+    } catch (parseError) {
+      return badRequest(
+        'Invalid JSON in request body',
+        { userId, hotelId: user?.hotelId, endpoint: '/api/auth/staff/change-password', method: 'POST' }
       )
     }
 
+    const { currentPassword, newPassword } = body
+
+    // Validate required fields
+    if (!currentPassword || !newPassword) {
+      return badRequest(
+        'Current password and new password are required',
+        { userId, hotelId: user?.hotelId, endpoint: '/api/auth/staff/change-password', method: 'POST' },
+        {
+          missing: [
+            !currentPassword && 'currentPassword',
+            !newPassword && 'newPassword'
+          ].filter(Boolean)
+        }
+      )
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      return badRequest(
+        'New password must be at least 8 characters long',
+        { userId, hotelId: user?.hotelId, endpoint: '/api/auth/staff/change-password', method: 'POST' }
+      )
+    }
+
+    // DB operation: wrapped in try/catch
     const result = await changeStaffPassword(
-      user.id,
+      userId,
       currentPassword,
       newPassword
     )
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
+      return badRequest(
+        result.error || 'Password change failed',
+        { userId, hotelId: user?.hotelId, endpoint: '/api/auth/staff/change-password', method: 'POST' }
       )
     }
 
     return NextResponse.json({
       success: true,
-      message: 'تم تغيير كلمة المرور بنجاح'
+      message: 'Password changed successfully'
     })
-  } catch (error) {
-    console.error('Change password error:', error)
-    return NextResponse.json(
-      { error: 'فشل في تغيير كلمة المرور' },
-      { status: 500 }
+  } catch (error: any) {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as any
+    
+    return internalError(
+      error,
+      { userId: user?.id, hotelId: user?.hotelId, endpoint: '/api/auth/staff/change-password', method: 'POST' },
+      'Failed to change password'
     )
   }
 })

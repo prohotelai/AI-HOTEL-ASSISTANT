@@ -65,6 +65,7 @@ model Hotel {
   conversations         Conversation[]
   roles                 Role[]
   qrTokens              GuestStaffQRToken[]
+  hotelQRCode           HotelQRCode? // Admin-generated unified QR code
   usageRecords          UsageRecord[]
   auditLogs             AuditLog[]
   mobileMagicLinkTokens MobileMagicLinkToken[]
@@ -101,6 +102,9 @@ model Hotel {
   // NEW: Session management
   staffSessions StaffSession[]
   guestSessions GuestSession[]
+
+  // Staff management
+  staffMembers Staff[] @relation("staffMembers")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -147,6 +151,7 @@ model User {
   auditLogs            AuditLog[]
   staffInvitationsSent StaffInvitation[]
   staffSessions        StaffSession[]
+  staffRecord          Staff? // Link to staff record (if this user is a staff member)
 
   // Phase 5: Support tickets
   tickets            Ticket[]
@@ -414,6 +419,81 @@ model UserRole {
   @@index([roleId])
 }
 
+// ========== STAFF MANAGEMENT ==========
+
+enum StaffStatus {
+  PENDING // Created but not yet activated (no User account)
+  ACTIVE // Has User account, can log in
+  INACTIVE // Disabled but record retained
+  TERMINATED // Removed from payroll
+}
+
+enum StaffRole {
+  RECEPTION // Front desk staff
+  HOUSEKEEPING // Housekeeping department
+  MAINTENANCE // Maintenance & repairs
+  CONCIERGE // Guest services
+  SECURITY // Security staff
+  MANAGER // Department manager
+  HR // HR department
+  ACCOUNTING // Accounting department
+  KITCHEN // Kitchen staff
+  BAR // Bar staff
+  ROOM_SERVICE // Room service staff
+  OTHER // Other roles
+}
+
+// Staff: Hotel staff records (independent of User auth)
+model Staff {
+  id String @id @default(cuid())
+
+  // Hotel association (tenant scoping)
+  hotelId String
+  hotel   Hotel  @relation("staffMembers", fields: [hotelId], references: [id], onDelete: Cascade)
+
+  // Staff identity (auto-generated, unique per hotel)
+  staffId String // e.g., ST-00001, ST-00002
+  firstName String
+  lastName String
+  email String
+  phone String?
+
+  // Role and status
+  staffRole StaffRole
+  status StaffStatus @default(PENDING)
+
+  // Optional user account (created later when staff activates)
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // HR metadata
+  dateOfBirth DateTime?
+  address String?
+  department String?
+  hireDate DateTime?
+  
+  // Admin notes
+  notes String? @db.Text
+
+  // Audit trail
+  createdBy String // User ID of admin who created this record
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete support
+  deactivatedAt DateTime?
+  deactivatedBy String?
+
+  // Constraints & Indexes
+  @@unique([hotelId, staffId])
+  @@unique([hotelId, email])
+  @@index([hotelId])
+  @@index([staffId])
+  @@index([status])
+  @@index([staffRole])
+}
+
+
 // GuestStaffQRTokens: QR code login tokens for guests and staff
 model GuestStaffQRToken {
   id String @id @default(cuid())
@@ -465,6 +545,45 @@ model GuestStaffQRToken {
   @@index([expiresAt])
   @@index([isUsed])
   @@index([revokedAt])
+}
+
+// HotelQRCode: Unified QR code per hotel for access (admin-generated)
+// - One active QR code per hotel at a time
+// - Admin can regenerate (invalidates previous)
+// - Content: { hotelId }
+// - Redirects to: /access?hotelId=XXX
+// - Security: ID validation, not QR secrecy
+model HotelQRCode {
+  id String @id @default(cuid())
+
+  // Multi-tenant: one per hotel
+  hotelId String @unique
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  // QR token (UUID or short code)
+  token String @unique @db.VarChar(255)
+
+  // QR content JSON: { hotelId: "hotel_id" }
+  qrContent String @db.Text // JSON stringified
+
+  // Lifecycle
+  isActive  Boolean   @default(true) // Can be deactivated
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  revokedAt DateTime? // When replaced by new QR
+
+  // Audit trail
+  createdBy String? // Admin user ID who generated
+  revokedBy String? // Admin user ID who revoked
+
+  // Metadata
+  metadata String? @db.Text // JSON: { ipAddress, userAgent, etc. }
+
+  // Constraints
+  @@unique([hotelId, isActive], name: "hotel_unique_active_qr")
+  @@index([hotelId])
+  @@index([token])
+  @@index([isActive])
 }
 
 // ========== SECURITY & COMPLIANCE (PHASE 1) ==========
@@ -602,6 +721,13 @@ enum SubscriptionStatus {
   CANCELED // User canceled
   EXPIRED // Trial/subscription ended
   PAUSED // Manually paused
+}
+
+// Onboarding Status
+enum OnboardingStatus {
+  PENDING // Not started
+  IN_PROGRESS // Currently being completed
+  COMPLETED // Wizard finished
 }
 
 // ========== PMS CORE ENUMS ==========
