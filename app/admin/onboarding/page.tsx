@@ -61,13 +61,14 @@ export default function OnboardingPage() {
         return
       }
 
-      // Load hotel data using hotelId from auth context
+      // Validate hotelId exists in auth context
       if (!hotelId) {
-        setLoadError('No hotel found. Please contact support.')
-        setLoading(false)
+        console.error('Critical Error: User authenticated but hotelId missing from session')
+        setLoadError('Your hotel account is incomplete. Please contact support.')
         return
       }
 
+      // Load hotel data using hotelId from auth context
       loadHotelData(hotelId)
     }
   }, [session, status, hotelId, userRole, onboardingCompleted, router])
@@ -84,10 +85,24 @@ export default function OnboardingPage() {
       })
 
       if (!res.ok) {
-        throw new Error(`Failed to load hotel data: ${res.status}`)
+        const error = await res.json()
+        throw new Error(`Failed to load hotel data: ${error.error || res.status}`)
       }
 
       const data = await res.json()
+      
+      // Validate hotel object has required name field - CRITICAL CHECK
+      if (!data || !data.id) {
+        console.error('Invalid hotel data received:', data)
+        throw new Error('Hotel setup is incomplete. Please contact support.')
+      }
+
+      // CRITICAL: Hotel MUST have a name - it's set at signup time
+      if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
+        console.error('Hotel missing required name field:', { hotelId: data.id, name: data.name })
+        throw new Error('Hotel setup is incomplete. Hotel name is missing. Please contact support.')
+      }
+
       setHotelData(data)
     } catch (error: any) {
       console.error('Failed to load hotel data:', error)

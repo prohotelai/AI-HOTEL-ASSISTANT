@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       )
     }
 
-    return NextResponse.json({ hotel })
+    return NextResponse.json(hotel)
   } catch (error) {
     console.error('Get hotel error:', error)
     return NextResponse.json(
@@ -143,7 +143,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       }
     })
 
-    return NextResponse.json({ hotel: updatedHotel })
+    return NextResponse.json(updatedHotel)
   } catch (error) {
     console.error('Update hotel error:', error)
     return NextResponse.json(

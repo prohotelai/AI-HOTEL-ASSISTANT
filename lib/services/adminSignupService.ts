@@ -42,19 +42,33 @@ function generateHotelId(): string {
 /**
  * Create hotel admin account with hotel entity in a single transaction
  * 
+ * CRITICAL SAFETY:
+ * - This creates both User AND Hotel atomically
+ * - If any step fails, entire transaction rolls back
+ * - No orphaned users or hotels left in database
+ * - Onboarding wizard DEPENDS on hotel existing at this point
+ * 
+ * User Setup:
+ * - role = OWNER (cannot be changed via API)
+ * - hotelId = newly created hotel's ID (required for all operations)
+ * - password = bcrypt hashed (cost 12, stronger than default)
+ * - onboardingCompleted = false (wizard must be completed before dashboard access)
+ * 
+ * Hotel Setup:
+ * - name = input.hotelName (immutable after signup)
+ * - slug = URL-friendly version (derived from name)
+ * - subscriptionPlan = STARTER (default free tier)
+ * - subscriptionStatus = ACTIVE (billing enabled)
+ * 
  * Validation:
  * - Email must be unique
- * - Password must be >= 8 chars
- * - Hotel name must not be empty
- * 
- * On success:
- * - User.hotelId set to new hotel's ID
- * - User.role set to OWNER
- * - User.onboardingCompleted = false (wizard required)
+ * - Password must be >= 8 chars (enforced)
+ * - Hotel name must not be empty (enforced)
  * 
  * On failure:
  * - Entire transaction rolls back
- * - No orphaned users or hotels created
+ * - No orphaned records created
+ * - Error thrown to caller (caught in API handler)
  */
 export async function createHotelAdminSignup(
   input: AdminSignupInput

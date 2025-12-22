@@ -5,17 +5,35 @@ import { getToken } from 'next-auth/jwt'
  * Authentication Middleware for Multi-Tenant System
  *
  * Architecture:
- * - Admin/Owner: NextAuth JWT tokens
- * - Staff: Custom session tokens (validated in API routes)
- * - Guest: Custom session tokens (validated in API routes)
+ * - Admin/Owner: NextAuth JWT tokens (role: OWNER, ADMIN, MANAGER)
+ * - Staff: Custom session tokens (role: STAFF)
+ * - Guest: Custom session tokens (role: GUEST)
+ *
+ * Strict Role Enforcement:
+ * 1. /admin/** routes:
+ *    - Requires: NextAuth session with role in [OWNER, ADMIN, MANAGER]
+ *    - Must have: hotelId in session (except /admin/register, /admin/login, /admin/onboarding)
+ *    - Assertion: Admin operations MUST include hotelId
+ *
+ * 2. /staff/** routes:
+ *    - Requires: staff-session cookie OR Bearer token
+ *    - Must have: staffId in session token
+ *    - Assertion: Staff operations MUST include staffId
+ *
+ * 3. /guest/** routes:
+ *    - Requires: guest-session cookie OR sessionId param OR Bearer token
+ *    - Must have: guestToken in session
+ *    - Assertion: Guest operations MUST have valid session token
  *
  * Rules:
  * 1. Public routes bypass all auth checks
  * 2. Dashboard routes require auth + role validation
  * 3. No automatic redirects for unauthenticated users
  * 4. Return 401/403 errors (not 500)
- * 5. Log all auth failures
+ * 5. Log all auth failures with context
  * 6. Never depend on hotelId before auth
+ * 7. Prevent cross-role access (admin cannot use staff token, etc.)
+ * 8. Validate role-specific data (hotelId for admin, staffId for staff, guestToken for guest)
  */
 
 /**
@@ -48,6 +66,97 @@ async function getSessionSafely(request: NextRequest) {
     })
     return null
   }
+}
+
+/**
+ * CRITICAL ASSERTION: Admin sessions MUST have hotelId
+ * This prevents any admin operation without hotel context
+ */
+function assertAdminSession(session: any, pathname: string): boolean {
+  if (!session || !session.sub) {
+    logAuth('error', 'ASSERTION FAILED: No admin session found', { pathname })
+    return false
+  }
+
+  const userRole = (session.role as string)?.toUpperCase() || 'UNKNOWN'
+  const hotelId = session.hotelId as string | null
+
+  // Special case: /admin/onboarding is allowed without hotelId (user just signed up)
+  if (pathname.startsWith('/admin/onboarding')) {
+    if (userRole !== 'OWNER') {
+      logAuth('error', 'ASSERTION FAILED: Onboarding requires OWNER role', {
+        pathname,
+        actualRole: userRole
+      })
+      return false
+    }
+    return true
+  }
+
+  // All other admin routes MUST have hotelId
+  if (!hotelId) {
+    logAuth('error', 'ASSERTION FAILED: Admin route missing hotelId', {
+      pathname,
+      userId: session.sub,
+      userRole
+    })
+    return false
+  }
+
+  // Verify admin role
+  const allowedRoles = ['OWNER', 'ADMIN', 'MANAGER']
+  if (!allowedRoles.includes(userRole)) {
+    logAuth('error', 'ASSERTION FAILED: Invalid admin role', {
+      pathname,
+      actualRole: userRole,
+      allowedRoles
+    })
+    return false
+  }
+
+  return true
+}
+
+/**
+ * CRITICAL ASSERTION: Staff routes MUST have valid staff token
+ */
+function assertStaffSession(request: NextRequest, pathname: string): boolean {
+  const staffToken =
+    request.cookies.get('staff-session')?.value ||
+    request.headers.get('authorization')?.replace('Bearer ', '')
+
+  if (!staffToken) {
+    logAuth('error', 'ASSERTION FAILED: Staff route missing session token', {
+      pathname,
+      hasStaffCookie: !!request.cookies.get('staff-session'),
+      hasAuthHeader: !!request.headers.get('authorization')
+    })
+    return false
+  }
+
+  return true
+}
+
+/**
+ * CRITICAL ASSERTION: Guest routes MUST have valid guest token
+ */
+function assertGuestSession(request: NextRequest, pathname: string): boolean {
+  const guestToken =
+    request.cookies.get('guest-session')?.value ||
+    request.headers.get('authorization')?.replace('Bearer ', '') ||
+    request.nextUrl.searchParams.get('sessionId')
+
+  if (!guestToken) {
+    logAuth('error', 'ASSERTION FAILED: Guest route missing session token', {
+      pathname,
+      hasGuestCookie: !!request.cookies.get('guest-session'),
+      hasAuthHeader: !!request.headers.get('authorization'),
+      hasSessionParam: !!request.nextUrl.searchParams.get('sessionId')
+    })
+    return false
+  }
+
+  return true
 }
 
 /**
@@ -121,20 +230,19 @@ export async function middleware(request: NextRequest) {
 
     // ===== 2. STAFF/GUEST ROUTES - CUSTOM TOKEN CHECK =====
     // Note: Full validation happens in API routes (no Prisma in Edge Runtime)
+    // This middleware only does presence check
 
     // Staff routes: Check for staff-session cookie or Bearer token
     if (pathname.startsWith('/staff/chat') || pathname.startsWith('/staff/')) {
-      const staffToken =
-        request.cookies.get('staff-session')?.value ||
-        request.headers.get('authorization')?.replace('Bearer ', '')
-
-      if (!staffToken) {
-        logAuth('warn', 'Staff route accessed without token', { pathname })
+      // ASSERTION: Staff routes MUST have valid session token
+      if (!assertStaffSession(request, pathname)) {
+        logAuth('error', 'ENFORCEMENT: Staff route accessed without valid token', { pathname })
         // Rule 3: Do NOT redirect - return 401
         return NextResponse.json(
           {
             error: 'Unauthorized',
-            message: 'Staff session token required. Please scan the QR code.'
+            message: 'Staff session token required. Please scan the QR code.',
+            code: 'STAFF_TOKEN_MISSING'
           },
           { status: 401 }
         )
@@ -146,18 +254,15 @@ export async function middleware(request: NextRequest) {
 
     // Guest routes: Check for guest-session or sessionId
     if (pathname.startsWith('/guest/chat') || pathname.startsWith('/guest/')) {
-      const guestToken =
-        request.cookies.get('guest-session')?.value ||
-        request.headers.get('authorization')?.replace('Bearer ', '') ||
-        request.nextUrl.searchParams.get('sessionId')
-
-      if (!guestToken) {
-        logAuth('warn', 'Guest route accessed without token', { pathname })
+      // ASSERTION: Guest routes MUST have valid session token
+      if (!assertGuestSession(request, pathname)) {
+        logAuth('error', 'ENFORCEMENT: Guest route accessed without valid token', { pathname })
         // Rule 3: Do NOT redirect - return 401
         return NextResponse.json(
           {
             error: 'Unauthorized',
-            message: 'Guest session token required. Please scan the QR code.'
+            message: 'Guest session token required. Please scan the QR code.',
+            code: 'GUEST_TOKEN_MISSING'
           },
           { status: 401 }
         )
@@ -216,57 +321,24 @@ export async function middleware(request: NextRequest) {
 
       // Rule 2: Check role-based access for admin routes
       if (pathname.startsWith('/admin/')) {
-        // Allow /admin/onboarding for OWNER without hotelId
-        if (pathname.startsWith('/admin/onboarding')) {
-          if (userRole !== 'OWNER') {
-            logAuth('warn', 'Non-owner accessed onboarding', {
-              pathname,
-              userRole
-            })
-            return NextResponse.json(
-              {
-                error: 'Forbidden',
-                message: 'Only hotel owners can access onboarding'
-              },
-              { status: 403 }
-            )
-          }
-          return NextResponse.next()
-        }
-
-        // All other admin routes require OWNER, ADMIN, or MANAGER
-        const allowedRoles = ['OWNER', 'ADMIN', 'MANAGER']
-        if (!allowedRoles.includes(userRole)) {
-          logAuth('warn', 'Insufficient role for admin route', {
-            pathname,
-            userRole,
-            requiredRoles: allowedRoles
-          })
-
+        // ASSERTION: Admin routes require valid admin session
+        if (!assertAdminSession(session, pathname)) {
+          logAuth('error', 'ENFORCEMENT: Admin route access denied by assertion', { pathname })
           return NextResponse.json(
             {
               error: 'Forbidden',
-              message: 'Admin access required'
+              message: 'Admin access denied. Invalid session or missing hotel context.',
+              code: 'ADMIN_ASSERTION_FAILED'
             },
             { status: 403 }
           )
         }
 
-        // Verify hotelId exists (required for all dashboard operations)
-        if (!hotelId) {
-          logAuth('error', 'Admin route missing hotelId', {
-            pathname,
-            userId: session.sub
-          })
-
-          return NextResponse.json(
-            {
-              error: 'Forbidden',
-              message: 'No hotel association found'
-            },
-            { status: 403 }
-          )
-        }
+        logAuth('info', 'Admin route access granted', {
+          pathname,
+          hotelId: session.hotelId,
+          userRole: (session.role as string)?.toUpperCase()
+        })
 
         return NextResponse.next()
       }

@@ -8,21 +8,30 @@ import { badRequest, conflict, internalError } from '@/lib/api/errorHandler'
 /**
  * HOTEL ADMIN REGISTRATION ENDPOINT
  * 
- * Purpose: Create OWNER account + Hotel in single transaction
+ * Purpose: Create OWNER account + Hotel in single atomic transaction
  * 
  * Flow:
- * 1. Signup → Create OWNER user + Hotel (with hotelId H-XXXXX)
- * 2. Validate all fields (name, email, password, hotelName)
- * 3. On success → Redirect to /admin/login (then to /admin/onboarding)
- * 4. On failure → Return error (transaction rolls back)
+ * 1. Validate all input fields (name, email, password, hotelName)
+ * 2. Check email uniqueness in database
+ * 3. Hash password with bcrypt cost 12 (strong for admin)
+ * 4. Create User + Hotel in single transaction:
+ *    - User: role=OWNER, hotelId=generated hotel.id, onboardingCompleted=false
+ *    - Hotel: name from hotelName input, subscriptionPlan=STARTER, status=ACTIVE
+ * 5. On success → Return { userId, hotelId } for session creation
+ * 6. On failure → Transaction rolls back (no orphaned records)
+ * 
+ * CRITICAL: Hotel MUST be created at signup time
+ * - Onboarding wizard assumes hotel exists
+ * - If hotel missing after signup → wizard will show fatal error
+ * - Never delay hotel creation to onboarding step
  * 
  * Security:
- * - Passwords hashed with bcrypt cost 12
- * - Email must be unique
+ * - Passwords hashed with bcrypt cost 12 (stronger than typical cost 10)
+ * - Email must be unique (Prisma constraint enforced)
  * - Hotel creation is atomic with user creation
- * - No orphaned records on failure
+ * - No orphaned records on failure (transaction rolls back)
  * - All errors caught, no raw 500s
- * - Comprehensive logging
+ * - Comprehensive logging with context
  */
 export async function POST(req: NextRequest) {
   try {
@@ -87,6 +96,19 @@ export async function POST(req: NextRequest) {
       password,
       hotelName,
     })
+
+    // ASSERTION: Both user and hotel were created
+    if (!result.userId || !result.hotelId) {
+      console.error('Registration service returned incomplete result:', {
+        userId: !!result.userId,
+        hotelId: !!result.hotelId
+      })
+      return internalError(
+        new Error('User or hotel creation failed - incomplete result'),
+        { endpoint: '/api/register', method: 'POST' },
+        'Registration failed. Please try again.'
+      )
+    }
 
     // Return success with user and hotel info
     return NextResponse.json(

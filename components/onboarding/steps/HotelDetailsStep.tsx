@@ -112,13 +112,13 @@ export default function HotelDetailsStep({
           <div className="flex items-center gap-3 mb-4">
             <Building2 className="w-5 h-5 text-blue-600" />
             <h3 className="text-lg font-semibold text-gray-900">
-              Hotel Name
+              Hotel Name (Locked)
             </h3>
           </div>
-          <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-gray-900 font-medium">{hotelData.name}</p>
-            <p className="text-sm text-gray-500 mt-1">
-              This was set during signup and cannot be changed here
+          <div className="px-4 py-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-gray-900 font-medium text-lg">{hotelData.name}</p>
+            <p className="text-sm text-gray-600 mt-2">
+              ✓ This name was set during your signup and is now permanent. You cannot change it.
             </p>
           </div>
         </div>

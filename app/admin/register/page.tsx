@@ -1,3 +1,13 @@
+/**
+ * Admin Registration Page (Signup)
+ * 
+ * CRITICAL: This page MUST show the Hotel Name field.
+ * If you don't see it, check:
+ * 1. This file is being served (not cached)
+ * 2. Build includes this change
+ * 3. Browser cache is cleared
+ */
+
 'use client'
 
 import { useState } from 'react'
@@ -17,6 +27,10 @@ export default function RegisterPage() {
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // DEBUG: Log component mount to verify page is rendering
+  console.log('🔵 SIGNUP PAGE LOADED - Hotel name field should be visible below password')
+  console.log('Form state:', { formData })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,6 +55,14 @@ export default function RegisterPage() {
         throw new Error('Hotel name is required')
       }
 
+      // DEBUG: Log the payload being sent
+      console.log('📋 SIGNUP FORM SUBMISSION:', {
+        name: formData.name,
+        email: formData.email,
+        hotelName: formData.hotelName,
+        timestamp: new Date().toISOString(),
+      })
+
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,7 +75,7 @@ export default function RegisterPage() {
       }
 
       const result = await response.json()
-      console.log('Signup successful:', { hotelId: result.hotelId, userId: result.userId })
+      console.log('✅ Signup successful:', { hotelId: result.hotelId, userId: result.userId })
 
       // Redirect to admin login, which will then redirect to onboarding
       router.push('/admin/login?registered=true')
@@ -95,6 +117,16 @@ export default function RegisterPage() {
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
+
+          {/* VISUAL INDICATOR: This shows the hotel name field is below */}
+          <div className="rounded-md bg-blue-50 border-2 border-blue-500 p-4">
+            <p className="text-sm font-bold text-blue-900">
+              ✓ Hotel Name Field is ACTIVE and REQUIRED below
+            </p>
+            <p className="text-xs text-blue-700 mt-1">
+              You must enter your hotel name (2+ characters) to create an account.
+            </p>
+          </div>
 
           <div className="space-y-4">
             <div>
@@ -150,18 +182,25 @@ export default function RegisterPage() {
 
             <div>
               <label htmlFor="hotelName" className="block text-sm font-medium text-gray-700">
-                Hotel name
+                Hotel name *
               </label>
+              <p className="text-xs text-orange-600 font-semibold mb-2">
+                ⚠️ Hotel name is required and cannot be changed later. Please verify it&apos;s correct.
+              </p>
               <Input
                 id="hotelName"
                 name="hotelName"
                 type="text"
                 required
+                minLength={2}
                 value={formData.hotelName}
                 onChange={handleChange}
                 className="mt-1"
-                placeholder="Your hotel name"
+                placeholder="e.g., Sunset Beach Hotel"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Minimum 2 characters. This will be used as your hotel&apos;s permanent identifier.
+              </p>
             </div>
           </div>
 
@@ -174,7 +213,7 @@ export default function RegisterPage() {
           </Button>
 
           <p className="text-xs text-center text-gray-500">
-            After signup, you&apos;ll complete hotel setup in the onboarding wizard
+            Hotel name is required to set up your account and cannot be changed later.
           </p>
         </form>
       </div>
