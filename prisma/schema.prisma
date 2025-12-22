@@ -98,6 +98,7 @@ model Hotel {
   widgetKeys          WidgetKey[]
   staffInvitations    StaffInvitation[]
   knowledgeBaseChunks KnowledgeBaseChunk[]
+  serviceConfig       ServiceConfig? // AI service configuration
 
   // NEW: Session management
   staffSessions StaffSession[]
@@ -1727,6 +1728,28 @@ model OnboardingProgress {
 
   @@index([hotelId])
   @@index([isCompleted])
+}
+
+// Service Configuration: Persist enabled/disabled state for hotel AI services
+model ServiceConfig {
+  id      String @id @default(cuid())
+  hotelId String @unique
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  // Service flags
+  aiGuestChat        Boolean @default(true)  // 24/7 AI chatbot for guests
+  analyticsDashboard Boolean @default(true)  // Guest interactions analytics
+  guestPrivacyMode   Boolean @default(true)  // GDPR-compliant data handling
+
+  // Audit
+  configuredBy String? // User ID who configured
+  configuredAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+
+  @@index([hotelId])
+  @@index([configuredAt])
 }
 
 // Log onboarding events for analytics

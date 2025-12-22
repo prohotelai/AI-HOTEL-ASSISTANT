@@ -2,6 +2,12 @@
  * Onboarding Step 3: Services Setup
  * 
  * Configure AI assistant services and integrations
+ * 
+ * CRITICAL ARCHITECTURE:
+ * - Sends services object with boolean flags matching API contract
+ * - Validates all services are boolean before submission
+ * - Displays detailed error messages from backend
+ * - Disables Save button while saving to prevent double-submission
  */
 
 'use client'
@@ -33,21 +39,21 @@ export default function ServicesSetupStep({
 }: ServicesSetupStepProps) {
   const [services, setServices] = useState<Service[]>([
     {
-      id: 'chat',
+      id: 'aiGuestChat',
       name: 'AI Guest Chat',
       description: 'Enable 24/7 AI chatbot for guest inquiries',
       icon: MessageSquare,
       enabled: true,
     },
     {
-      id: 'analytics',
+      id: 'analyticsDashboard',
       name: 'Analytics Dashboard',
       description: 'Track guest interactions and AI performance',
       icon: BarChart3,
       enabled: true,
     },
     {
-      id: 'privacy',
+      id: 'guestPrivacyMode',
       name: 'Guest Privacy Mode',
       description: 'GDPR-compliant guest data handling',
       icon: Lock,
@@ -64,6 +70,8 @@ export default function ServicesSetupStep({
         s.id === id ? { ...s, enabled: !s.enabled } : s
       )
     )
+    // Clear error when user makes changes
+    setError('')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -73,18 +81,38 @@ export default function ServicesSetupStep({
     setSuccess(false)
 
     try {
-      const enabledServices = services
-        .filter((s) => s.enabled)
-        .map((s) => s.id)
+      // Build payload matching API contract
+      const payload = {
+        services: {
+          aiGuestChat: services.find(s => s.id === 'aiGuestChat')?.enabled ?? true,
+          analyticsDashboard: services.find(s => s.id === 'analyticsDashboard')?.enabled ?? true,
+          guestPrivacyMode: services.find(s => s.id === 'guestPrivacyMode')?.enabled ?? true
+        }
+      }
+
+      // Validate payload structure before sending
+      if (!payload.services || typeof payload.services.aiGuestChat !== 'boolean') {
+        throw new Error('Invalid service configuration')
+      }
 
       const res = await fetch(`/api/hotels/${hotelId}/services`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabledServices }),
+        body: JSON.stringify(payload),
       })
 
+      const data = await res.json()
+
       if (!res.ok) {
-        throw new Error('Failed to save service configuration')
+        // Display backend error details
+        const errorMsg = data.error || 'Failed to save service configuration'
+        const errorCode = data.code ? ` (${data.code})` : ''
+        throw new Error(errorMsg + errorCode)
+      }
+
+      // Validate response structure
+      if (!data.success || !data.services) {
+        throw new Error('Invalid response from server')
       }
 
       setSuccess(true)
@@ -115,7 +143,12 @@ export default function ServicesSetupStep({
 
       {error && (
         <div className="mb-6 rounded-md bg-red-50 p-4 border border-red-200">
-          <p className="text-sm text-red-800">{error}</p>
+          <p className="text-sm text-red-800">
+            <strong>Error:</strong> {error}
+          </p>
+          <p className="text-xs text-red-700 mt-1">
+            Please try again or contact support if the problem persists.
+          </p>
         </div>
       )}
 
@@ -193,7 +226,8 @@ export default function ServicesSetupStep({
           <button
             type="button"
             onClick={onBack}
-            className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            disabled={saving}
+            className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back
           </button>
