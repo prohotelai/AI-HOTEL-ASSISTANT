@@ -31,7 +31,7 @@ function OwnerLoginContent() {
       const user = session.user as any
       
       // Check if owner needs onboarding
-      if ((user.role === 'OWNER' || user.role === 'owner') && (!user.hotelId || !user.onboardingCompleted)) {
+      if ((user.role === 'OWNER' || user.role === 'owner') && !user.hotelId) {
         router.push('/admin/onboarding')
       } else {
         router.push('/dashboard')

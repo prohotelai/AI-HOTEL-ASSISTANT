@@ -5,7 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { SystemRole } from '@prisma/client'
+import { SystemRole } from '@/lib/types/roles'
 
 /**
  * توليد معرف موظف جديد من قبل الأدمن
@@ -41,6 +41,7 @@ export async function generateStaffId(
     // توليد معرف موظف فريد
     const rolePrefix: Record<SystemRole, string> = {
       [SystemRole.OWNER]: 'OWN',
+      [SystemRole.ADMIN]: 'ADM',
       [SystemRole.MANAGER]: 'MGR',
       [SystemRole.RECEPTION]: 'REC',
       [SystemRole.STAFF]: 'STF',

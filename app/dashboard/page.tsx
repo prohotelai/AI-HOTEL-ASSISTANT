@@ -20,7 +20,7 @@ export default function DashboardHome() {
       const user = session.user as any
 
       // Check if OWNER needs onboarding
-      if (role === 'OWNER' && (!user.hotelId || !user.onboardingCompleted)) {
+      if (role === 'OWNER' && !user.hotelId) {
         router.push('/onboarding')
         return
       }

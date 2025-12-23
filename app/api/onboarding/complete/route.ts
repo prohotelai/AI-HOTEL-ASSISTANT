@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     // Verify user belongs to this hotel
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { hotelId: true, onboardingCompleted: true }
+      select: { hotelId: true }
     })
 
     if (!user || user.hotelId !== hotelId) {
@@ -35,15 +35,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark onboarding as completed using service layer
-    await prisma.$transaction(async (tx) => {
-      // Update user to mark onboarding completed
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          onboardingCompleted: true,
-        }
-      })
-    })
+    // Note: onboardingCompleted field has been removed - using wizardStatus instead
+    // await prisma.$transaction(async (tx) => {
+    //   Update moved to completeOnboarding service
+    // })
 
     // Mark the wizard as COMPLETED in onboarding progress
     const result = await completeOnboarding(hotelId)

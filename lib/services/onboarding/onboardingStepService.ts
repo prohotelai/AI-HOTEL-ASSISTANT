@@ -144,16 +144,12 @@ async function syncRegistrationStepToUser(
   status: OnboardingStatus
 ): Promise<void> {
   try {
-    await prisma.user.updateMany({
-      where: { hotelId },
-      data: {
-        registrationStep: stepName,
-        registrationStatus: status,
-      },
-    })
+    // Registration step tracking has been removed from User table
+    // Step tracking is now only in OnboardingProgress table
+    console.log(`[OnboardingSync] Step ${stepName} status ${status} for hotel ${hotelId}`)
   } catch (error) {
     // Log but don't fail if sync fails - onboarding progress is still updated
-    console.error('Failed to sync registration step to User:', error)
+    console.error('Failed to sync registration step:', error)
   }
 }
 

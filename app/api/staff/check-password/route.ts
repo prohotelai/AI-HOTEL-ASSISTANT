@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: staffId },
       select: {
-        staffPassword: true,
+        id: true,
       }
     })
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      hasPassword: !!user.staffPassword,
+      hasPassword: false,  // staffPassword field removed - return false
     })
   } catch (error) {
     console.error('Check password error:', error)

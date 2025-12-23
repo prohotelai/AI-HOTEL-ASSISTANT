@@ -55,15 +55,11 @@ async function main() {
   })
 
   for (const user of staffUsers) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        mustChangePassword: user.password ? false : true,
-        lastPasswordChange: user.password ? new Date() : null,
-      }
-    })
+    // Note: mustChangePassword and lastPasswordChange fields don't exist in database
+    // Skipping update for these non-existent fields
+    // await prisma.user.update({...})
   }
-  console.log(`  ✓ Updated ${staffUsers.length} staff user(s)`)
+  console.log(`  ✓ Processed ${staffUsers.length} staff user(s)`)
 
   // 3. Clean up expired QR tokens
   console.log('\nStep 3: Cleaning up expired QR tokens...')

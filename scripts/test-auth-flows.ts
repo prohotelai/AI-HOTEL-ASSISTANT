@@ -74,12 +74,12 @@ async function main() {
         password: hashedPassword,
         role: 'OWNER',
         hotelId: hotel.id,
-        onboardingCompleted: false,
+        // onboardingCompleted: false, // field doesn't exist in database
       }
     })
     console.log(`✅ Admin user created: ${admin.email} (${admin.id})`)
     console.log(`   Role: ${admin.role}`)
-    console.log(`   Onboarding: ${admin.onboardingCompleted}`)
+    // console.log(`   Onboarding: ${admin.onboardingCompleted}`) // field doesn't exist
     console.log(`   Password: Test123!`)
 
   } catch (error: any) {
@@ -97,15 +97,16 @@ async function main() {
       console.log('⚠️  No hotel found, skipping staff test')
     } else {
       // Create staff user
-      const staffPassword = await bcrypt.hash('Staff123!', 12)
+      // Note: staffPassword and mustChangePassword don't exist in database
+      // const staffPassword = await bcrypt.hash('Staff123!', 12)
       const staff = await prisma.user.create({
         data: {
           name: 'Test Staff',
           email: `staff-${Date.now()}@example.com`,
-          staffPassword,
+          // staffPassword, // field doesn't exist
           role: 'STAFF',
           hotelId: hotel.id,
-          mustChangePassword: false,
+          // mustChangePassword: false, // field doesn't exist
         }
       })
       console.log(`✅ Staff user created: ${staff.email} (${staff.id})`)

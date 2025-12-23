@@ -97,31 +97,14 @@ export async function POST(req: NextRequest) {
       select: {
         id: true,
         email: true,
-        registrationStatus: true,
         hotelId: true,
       },
     })
 
-    // If email exists and registration is IN_PROGRESS, return resume response
-    if (existingUser && existingUser.registrationStatus === 'IN_PROGRESS') {
-      return NextResponse.json(
-        {
-          success: false,
-          resumable: true,
-          message: 'Registration already in progress',
-          action: 'resume',
-          userId: existingUser.id,
-          hotelId: existingUser.hotelId,
-          email: existingUser.email,
-        },
-        { status: 200 } // 200 OK, not conflict - this is not an error
-      )
-    }
-
-    // If email exists and registration is COMPLETED, return conflict
-    if (existingUser && existingUser.registrationStatus === 'COMPLETED') {
+    // If email exists, return conflict
+    if (existingUser) {
       return conflict(
-        'An account with this email already exists and is fully registered',
+        'An account with this email already exists',
         { endpoint: '/api/register', method: 'POST' }
       )
     }

@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Permission } from '@/lib/rbac'
-import { SystemRole } from '@prisma/client'
+import { SystemRole } from '@/lib/types/roles'
 
 /**
  * التحقق من صلاحية المستخدم

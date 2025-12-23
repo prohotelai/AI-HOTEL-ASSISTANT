@@ -31,16 +31,11 @@ export const POST = createStepHandler('finish', {
         data: {},
       })
 
-      // Mark User registration as COMPLETED and clear step tracking
+      // Mark onboarding as COMPLETED - registration tracking fields removed from schema
       if (userId) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            registrationStatus: 'COMPLETED',
-            registrationStep: null,
-            onboardingCompleted: true, // Also mark onboarding as complete
-          },
-        })
+        // Registration status fields have been removed from User table
+        // Onboarding completion is now tracked in OnboardingProgress table
+        console.log('✅ Onboarding completed for hotel:', hotelId)
       }
 
       return 'completed'

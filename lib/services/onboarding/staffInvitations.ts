@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { hashToken } from '@/lib/security/tokenUtils'
-import { SystemRole } from '@prisma/client'
+import { SystemRole } from '@/lib/types/roles'
 
 interface InvitationData {
   email: string

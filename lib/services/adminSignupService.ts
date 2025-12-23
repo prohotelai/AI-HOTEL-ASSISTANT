@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
-import { SystemRole, SubscriptionPlan, SubscriptionStatus } from '@prisma/client'
+import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { nanoid } from 'nanoid'
 
@@ -92,7 +92,11 @@ export async function createHotelAdminSignup(
 
   // Check if email already exists
   const existingUser = await prisma.user.findUnique({
-    where: { email: emailLower }
+    where: { email: emailLower },
+    select: {
+      id: true,
+      email: true,
+    }
   })
 
   if (existingUser) {
@@ -107,13 +111,15 @@ export async function createHotelAdminSignup(
   
   // Ensure uniqueness (extremely rare collision, but be safe)
   let existingHotel = await prisma.hotel.findUnique({
-    where: { id: hotelId }
+    where: { id: hotelId },
+    select: { id: true }
   })
   
   while (existingHotel) {
     hotelId = generateHotelId()
     existingHotel = await prisma.hotel.findUnique({
-      where: { id: hotelId }
+      where: { id: hotelId },
+      select: { id: true }
     })
   }
 
@@ -129,9 +135,6 @@ export async function createHotelAdminSignup(
         // Set default plan to STARTER
         subscriptionPlan: SubscriptionPlan.STARTER,
         subscriptionStatus: SubscriptionStatus.ACTIVE,
-        // Initialize AI Setup Wizard
-        wizardStatus: 'IN_PROGRESS',
-        wizardStep: 1, // Start at step 1
       }
     })
 
@@ -141,15 +144,8 @@ export async function createHotelAdminSignup(
         name: input.name?.trim() || null,
         email: emailLower,
         password: hashedPassword,
-        role: SystemRole.OWNER,
+        role: 'OWNER' as any, // Use string directly, avoiding enum type issues
         hotelId: hotel.id,
-        onboardingCompleted: false,
-        // Set registration wizard state to IN_PROGRESS
-        registrationStatus: 'IN_PROGRESS',
-        registrationStep: 'hotel-details', // Start at first step
-        // Initialize AI Setup Wizard on user too
-        wizardStatus: 'IN_PROGRESS',
-        wizardStep: 1,
       }
     })
 

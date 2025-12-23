@@ -23,9 +23,9 @@ model Hotel {
   email   String?
   phone   String?
   address String?
-  city    String?
-  country String?
-  hotelType String? // "Hotel" | "Boutique" | "Aparthotel"
+  // city    String?
+  // country String?
+  // hotelType String? // "Hotel" | "Boutique" | "Aparthotel"
 
   // Widget configuration
   widgetColor String? @default("#3B82F6")
@@ -64,9 +64,9 @@ model Hotel {
   storageUsedGB     Float    @default(0)
 
   // AI Setup Wizard state (NEW - replaces old OnboardingProgress)
-  wizardStatus      String?   // "IN_PROGRESS" | "COMPLETED" | null
-  wizardStep        Int?      // Current step: 1, 2, 3, 4, or null if completed
-  wizardCompletedAt DateTime? // When wizard was completed
+  // wizardStatus      String?   // "IN_PROGRESS" | "COMPLETED" | null
+  // wizardStep        Int?      // Current step: 1, 2, 3, 4, or null if completed
+  // wizardCompletedAt DateTime? // When wizard was completed
 
   // Multi-tenancy relationships
   users                 User[]
@@ -131,7 +131,7 @@ model User {
   emailVerified    DateTime?
   password         String? // Hashed (for ADMIN/OWNER)
   image            String?
-  role             SystemRole @default(GUEST)
+  role             String     @default("GUEST") // Changed from enum to String for compatibility
   isSuspended      Boolean    @default(false)
   suspendedAt      DateTime?
   suspensionReason String?
@@ -140,27 +140,27 @@ model User {
   hotelId String?
   hotel   Hotel?  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
-  // Onboarding state (for OWNER role)
-  onboardingCompleted Boolean @default(false)
+  // Onboarding state (for OWNER role) - DEPRECATED (use wizardStatus instead)
+  // onboardingCompleted Boolean? // Deprecated: use wizardStatus
 
   // Registration wizard state (for admin signup flow - OWNER only)
-  registrationStatus OnboardingStatus @default(PENDING) // Tracks wizard completion
-  registrationStep   String?                           // Current step in wizard (e.g., 'hotel-details')
+  // registrationStatus String?           // "IN_PROGRESS" | "COMPLETED" | null
+  // registrationStep   String?           // Current step in wizard (e.g., 'hotel-details')
 
   // AI Setup Wizard state (replaces old onboarding - NEW)
   // These fields track the new simplified 4-step wizard
-  wizardStatus      String?           // "IN_PROGRESS" | "COMPLETED" | null
-  wizardStep        Int?              // Current step: 1, 2, 3, 4, or null if completed
-  wizardCompletedAt DateTime?         // When wizard was completed
+  // wizardStatus      String?           // "IN_PROGRESS" | "COMPLETED" | null
+  // wizardStep        Int?              // Current step: 1, 2, 3, 4, or null if completed
+  // wizardCompletedAt DateTime?         // When wizard was completed
 
   // Staff-specific fields
-  staffPassword      String? // Separate password for staff
-  mustChangePassword Boolean   @default(false)
-  lastPasswordChange DateTime?
+  // staffPassword      String? // Separate password for staff
+  // mustChangePassword Boolean? // Optional - may not exist in all databases
+  // lastPasswordChange DateTime?
 
   // Guest identification (lookup only, not credentials)
-  guestPassportId String? // For guest lookup
-  guestRoomNumber String? // Current room assignment
+  // guestPassportId String? // For guest lookup
+  // guestRoomNumber String? // Current room assignment
 
   accounts             Account[]
   sessions             Session[]
@@ -189,7 +189,6 @@ model User {
 
   @@index([email])
   @@index([hotelId])
-  @@index([registrationStatus])
 }
 
 // NextAuth Account model

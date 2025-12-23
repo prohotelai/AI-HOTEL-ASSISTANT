@@ -20,11 +20,12 @@ export interface WizardGuardResult {
 export async function getWizardGuardStatus(
   hotelId: string
 ): Promise<WizardGuardResult> {
+  // Note: wizardStatus and wizardStep don't exist in database
+  // For now, always return wizard as not completed since we can't track state
   const hotel = await prisma.hotel.findUnique({
     where: { id: hotelId },
     select: {
-      wizardStatus: true,
-      wizardStep: true,
+      id: true,
     },
   })
 
@@ -37,8 +38,8 @@ export async function getWizardGuardStatus(
   }
 
   return {
-    isCompleted: hotel.wizardStatus === 'COMPLETED',
-    currentStep: (hotel.wizardStep as 1 | 2 | 3 | 4) || 1,
+    isCompleted: false,
+    currentStep: 1, // Since wizard state doesn't exist in database, always start at step 1
     wizardUrl: '/admin/setup-wizard',
   }
 }

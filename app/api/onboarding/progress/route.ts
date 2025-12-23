@@ -40,14 +40,14 @@ export async function GET(req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        registrationStatus: true,
-        registrationStep: true,
+        // registrationStatus and registrationStep fields removed - no longer in database
+        id: true,
       },
     })
 
-    // If user has registration state and it's COMPLETED, return that
-    if (user?.registrationStatus === 'COMPLETED') {
-      // Return completed state
+    // Registration state tracking removed - use other mechanisms
+    if (false) {
+      // Return completed state (disabled)
       return NextResponse.json(
         {
           hotelId,
@@ -70,11 +70,8 @@ export async function GET(req: NextRequest) {
       progress = await initializeOnboarding(hotelId)
     }
 
-    // If user has a registrationStep, use it to determine current step
-    if (user?.registrationStep && !progress.completedSteps.includes(user.registrationStep)) {
-      // Resume from the user's last registered step
-      progress.currentStep = user.registrationStep
-    }
+    // Registration step tracking removed - no longer in database
+    // Use progress.currentStep from OnboardingProgress table instead
 
     return NextResponse.json(progress, { status: 200 })
   } catch (error: any) {

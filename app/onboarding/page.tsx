@@ -48,10 +48,9 @@ export default function OnboardingPage() {
     if (status === 'authenticated' && session?.user) {
       const user = session.user as any
 
-      // If user already completed onboarding, redirect to dashboard
-      if (user.hotelId && user.onboardingCompleted) {
-        router.push('/dashboard')
-        return
+      // If user already has hotelId, they can proceed with onboarding
+      if (user.hotelId) {
+        // Onboarding is in progress
       }
 
       // If user is not OWNER, redirect to appropriate page

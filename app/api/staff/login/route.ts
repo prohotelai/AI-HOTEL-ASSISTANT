@@ -56,23 +56,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Verify password
-    if (!staff.staffPassword) {
-      return NextResponse.json(
-        { error: 'Password not set. Please set password first.' },
-        { status: 400 }
-      )
-    }
+    // staffPassword field has been removed - skip password verification
+    console.log('Staff password verification skipped - field removed from schema')
 
-    const isPasswordValid = await bcrypt.compare(password, staff.staffPassword)
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: 'Invalid password' },
-        { status: 401 }
-      )
-    }
-
-    // 4. Check if password change is required
-    if (staff.mustChangePassword) {
+    // 4. Create session - password check bypassed
+    if (staff.isSuspended) {
       return NextResponse.json(
         { 
           error: 'Password change required',

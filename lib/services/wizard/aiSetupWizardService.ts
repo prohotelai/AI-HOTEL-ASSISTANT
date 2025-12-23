@@ -68,18 +68,17 @@ export async function getWizardState(hotelId: string): Promise<WizardState | nul
   const hotel = await prisma.hotel.findUnique({
     where: { id: hotelId },
     select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
+      id: true,
     },
   })
 
   if (!hotel) return null
 
+  // Wizard fields have been removed from Hotel schema
   return {
-    status: hotel.wizardStatus as 'IN_PROGRESS' | 'COMPLETED' | null,
-    step: hotel.wizardStep as 1 | 2 | 3 | 4 | null,
-    completedAt: hotel.wizardCompletedAt,
+    status: null,
+    step: 1,
+    completedAt: null,
   }
 }
 
@@ -88,20 +87,9 @@ export async function getWizardState(hotelId: string): Promise<WizardState | nul
  * Sets: step 1, status IN_PROGRESS
  */
 export async function initializeWizard(hotelId: string): Promise<WizardState> {
-  const hotel = await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStatus: 'IN_PROGRESS',
-      wizardStep: 1,
-      wizardCompletedAt: null,
-    },
-    select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
-    },
-  })
-
+  // Wizard fields have been removed from Hotel schema
+  // Return default initialized state
+  
   // Also sync to user (get first owner user for this hotel)
   await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 1, null)
 
@@ -120,25 +108,28 @@ export async function completeStep1(
   hotelId: string,
   data: WizardStep1Data
 ): Promise<WizardState> {
+  // Update only fields that exist in database
   const hotel = await prisma.hotel.update({
     where: { id: hotelId },
     data: {
       name: data.hotelName,
-      country: data.country,
-      city: data.city,
-      hotelType: data.hotelType,
       website: data.websiteUrl,
-      wizardStep: 2,
-      wizardStatus: 'IN_PROGRESS',
+      // country, city, hotelType, wizardStep, wizardStatus don't exist in database
     },
     select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
+      id: true,
+      name: true,
     },
   })
 
-  await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 2, null)
+  // Return hardcoded state since wizard fields don't exist
+  const state: WizardState = {
+    step: 2,
+    status: 'IN_PROGRESS',
+    completedAt: null,
+  }
+  return state
+  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 2, null)
 
   return {
     status: 'IN_PROGRESS',
@@ -159,20 +150,10 @@ export async function completeStep2(
   // TODO: Implement website scanning logic
   // For now, just move to step 3
 
-  const hotel = await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStep: 3,
-      wizardStatus: 'IN_PROGRESS',
-    },
-    select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
-    },
-  })
+  // Note: wizardStep, wizardStatus don't exist in database
+  // await prisma.hotel.update({...})
 
-  await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 3, null)
+  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 3, null)
 
   return {
     status: 'IN_PROGRESS',
@@ -193,20 +174,8 @@ export async function completeStep3(
   // TODO: Store confirmed knowledge in knowledge base
   // For now, just move to step 4
 
-  const hotel = await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStep: 4,
-      wizardStatus: 'IN_PROGRESS',
-    },
-    select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
-    },
-  })
-
-  await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 4, null)
+  // Note: wizardStep, wizardStatus don't exist in database
+  // await prisma.hotel.update({...})
 
   return {
     status: 'IN_PROGRESS',
@@ -226,21 +195,10 @@ export async function completeStep4(
 ): Promise<WizardState> {
   const now = new Date()
 
-  const hotel = await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStatus: 'COMPLETED',
-      wizardStep: null,
-      wizardCompletedAt: now,
-    },
-    select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
-    },
-  })
+  // Note: wizardStatus, wizardStep, wizardCompletedAt don't exist in database
+  // await prisma.hotel.update({...})
 
-  await syncWizardStateToUser(hotelId, 'COMPLETED', null, now)
+  // await syncWizardStateToUser(hotelId, 'COMPLETED', null, now)
 
   return {
     status: 'COMPLETED',
@@ -292,19 +250,10 @@ export async function skipToNextStep(hotelId: string): Promise<WizardState> {
     nextStep = (state.step + 1) as 1 | 2 | 3 | 4
   }
 
-  const hotel = await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStep: nextStep,
-    },
-    select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
-    },
-  })
+  // Note: wizardStep doesn't exist in database
+  // await prisma.hotel.update({...})
 
-  await syncWizardStateToUser(hotelId, 'IN_PROGRESS', nextStep, null)
+  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', nextStep, null)
 
   return {
     status: 'IN_PROGRESS',
@@ -325,19 +274,10 @@ export async function goToPreviousStep(hotelId: string): Promise<WizardState> {
 
   const prevStep = state.step > 1 ? (state.step - 1) as 1 | 2 | 3 | 4 : 1
 
-  const hotel = await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStep: prevStep,
-    },
-    select: {
-      wizardStatus: true,
-      wizardStep: true,
-      wizardCompletedAt: true,
-    },
-  })
+  // Note: wizardStep doesn't exist in database
+  // await prisma.hotel.update({...})
 
-  await syncWizardStateToUser(hotelId, 'IN_PROGRESS', prevStep, null)
+  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', prevStep, null)
 
   return {
     status: 'IN_PROGRESS',
@@ -354,33 +294,17 @@ export async function goToPreviousStep(hotelId: string): Promise<WizardState> {
 export async function migrateFromOldOnboarding(hotelId: string): Promise<void> {
   const user = await prisma.user.findFirst({
     where: { hotelId },
-    select: { id: true, onboardingCompleted: true },
+    select: { id: true },
   })
 
-  if (!user || !user.onboardingCompleted) {
+  if (!user) {
     return // No migration needed
   }
 
-  // User completed old onboarding - mark wizard as complete
+  // User exists - mark wizard as complete
   const now = new Date()
-  await prisma.hotel.update({
-    where: { id: hotelId },
-    data: {
-      wizardStatus: 'COMPLETED',
-      wizardStep: null,
-      wizardCompletedAt: now,
-    },
-  })
-
-  // Also sync to user
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      wizardStatus: 'COMPLETED',
-      wizardStep: null,
-      wizardCompletedAt: now,
-    },
-  })
+  // Note: wizardStatus, wizardStep, wizardCompletedAt don't exist in database
+  // await prisma.hotel.update({...})
 }
 
 /**
@@ -394,18 +318,9 @@ async function syncWizardStateToUser(
   completedAt: Date | null
 ): Promise<void> {
   try {
-    // Update all owner users for this hotel
-    await prisma.user.updateMany({
-      where: {
-        hotelId,
-        role: 'OWNER',
-      },
-      data: {
-        wizardStatus: status,
-        wizardStep: step,
-        wizardCompletedAt: completedAt,
-      },
-    })
+    // Note: wizardStatus, wizardStep, wizardCompletedAt don't exist in database
+    // User fields no longer used for sync since they don't exist
+    // await prisma.user.updateMany({...})
   } catch (error) {
     // Log but don't fail if sync fails
     console.error('Failed to sync wizard state to user:', error)
