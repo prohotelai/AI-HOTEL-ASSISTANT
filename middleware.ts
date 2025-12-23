@@ -259,7 +259,41 @@ export async function middleware(request: NextRequest) {
     }
 
     // 2. Check access using unified service
-    const accessCheck = await checkAccess(pathname, userContext)
+    let accessCheck: any
+    try {
+      accessCheck = await checkAccess(pathname, userContext)
+    } catch (accessCheckError) {
+      logAuth('error', 'Access check threw error, allowing public routes only', {
+        pathname,
+        error: accessCheckError instanceof Error ? accessCheckError.message : 'Unknown error',
+      })
+      
+      // On error, only allow public routes
+      const publicPaths = [
+        /^\/$/,
+        /^\/login/,
+        /^\/register/,
+        /^\/pricing/,
+        /^\/features/,
+        /^\/admin\/login/,
+        /^\/admin\/register/,
+        /^\/staff\/activate/,
+        /^\/guest\/access/,
+      ]
+      
+      if (!publicPaths.some(pattern => pattern.test(pathname))) {
+        // Block non-public routes when database is unavailable
+        return NextResponse.json(
+          {
+            error: 'Service Unavailable',
+            message: 'Authentication service temporarily unavailable. Please try again.',
+          },
+          { status: 503 }
+        )
+      }
+      
+      return NextResponse.next()
+    }
 
     if (!accessCheck.allowed) {
       logAuth('warn', 'Access denied', {
@@ -271,9 +305,9 @@ export async function middleware(request: NextRequest) {
 
       // Return appropriate response
       if (accessCheck.redirectUrl) {
-        return NextResponse.redirect(new URL(accessCheck.redirectUrl, request.url), {
-          status: accessCheck.httpStatus || 303,
-        })
+        // Note: NextResponse.redirect() doesn't support custom status codes in middleware
+        // It will use 307/308 temporary redirect by default
+        return NextResponse.redirect(new URL(accessCheck.redirectUrl, request.url))
       }
 
       const status = accessCheck.httpStatus || 403

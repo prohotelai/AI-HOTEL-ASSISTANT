@@ -272,31 +272,43 @@ export async function checkAccess(
   if (permissions.requirements?.onboardingRequired === 'COMPLETED') {
     // Skip check for onboarding routes themselves
     if (!pathname.startsWith('/admin/onboarding')) {
-      const onboardingStatus = await getOnboardingStatus(hotelId!)
-      
-      if (onboardingStatus !== 'COMPLETED') {
-        // Redirect to onboarding
-        return {
-          allowed: false,
-          redirectUrl: '/admin/onboarding',
-          httpStatus: 303,
-          reason: 'Onboarding not completed',
+      try {
+        const onboardingStatus = await getOnboardingStatus(hotelId!)
+        
+        if (onboardingStatus !== 'COMPLETED') {
+          // Redirect to onboarding
+          return {
+            allowed: false,
+            redirectUrl: '/admin/onboarding',
+            httpStatus: 303,
+            reason: 'Onboarding not completed',
+          }
         }
+      } catch (error) {
+        // If database check fails, log error and allow through
+        // The onboarding check will be done server-side
+        console.error('[ACCESS_CONTROL] Onboarding check failed:', error)
       }
     }
   }
 
   // If accessing onboarding but already completed, redirect away
   if (pathname.startsWith('/admin/onboarding')) {
-    const onboardingStatus = await getOnboardingStatus(hotelId!)
-    
-    if (onboardingStatus === 'COMPLETED') {
-      return {
-        allowed: false,
-        redirectUrl: '/dashboard/admin',
-        httpStatus: 303,
-        reason: 'Onboarding already completed',
+    try {
+      const onboardingStatus = await getOnboardingStatus(hotelId!)
+      
+      if (onboardingStatus === 'COMPLETED') {
+        return {
+          allowed: false,
+          redirectUrl: '/dashboard/admin',
+          httpStatus: 303,
+          reason: 'Onboarding already completed',
+        }
       }
+    } catch (error) {
+      // If database check fails, log error and allow through
+      // The onboarding redirect check will be done server-side
+      console.error('[ACCESS_CONTROL] Onboarding redirect check failed:', error)
     }
   }
 
@@ -359,27 +371,33 @@ export async function getDefaultRedirectUrl(userContext: UserContext): Promise<s
 
   // For admins, check onboarding status
   if ((role === 'OWNER' || role === 'ADMIN' || role === 'MANAGER') && hotelId) {
-    const onboardingStatus = await getOnboardingStatus(hotelId)
+    try {
+      const onboardingStatus = await getOnboardingStatus(hotelId)
 
-    if (onboardingStatus !== 'COMPLETED') {
-      // Get the last incomplete step and redirect to it
-      try {
-        const progress = await prisma.onboardingProgress.findUnique({
-          where: { hotelId },
-          select: { currentStep: true, completedSteps: true },
-        })
+      if (onboardingStatus !== 'COMPLETED') {
+        // Get the last incomplete step and redirect to it
+        try {
+          const progress = await prisma.onboardingProgress.findUnique({
+            where: { hotelId },
+            select: { currentStep: true, completedSteps: true },
+          })
 
-        if (progress?.currentStep) {
-          return `/admin/onboarding?step=${progress.currentStep}`
+          if (progress?.currentStep) {
+            return `/admin/onboarding?step=${progress.currentStep}`
+          }
+        } catch {
+          // Fallback
         }
-      } catch {
-        // Fallback
+
+        return '/admin/onboarding'
       }
 
-      return '/admin/onboarding'
+      return '/dashboard/admin'
+    } catch (error) {
+      console.error('[ACCESS_CONTROL] getDefaultRedirectUrl failed:', error)
+      // Fallback to dashboard on error
+      return '/dashboard/admin'
     }
-
-    return '/dashboard/admin'
   }
 
   // Default fallback
