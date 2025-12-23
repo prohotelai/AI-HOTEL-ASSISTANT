@@ -26,7 +26,7 @@ export default function DashboardHome() {
       }
 
       if (role === 'ADMIN' || role === 'OWNER') {
-        router.push('/dashboard/admin/pms')
+        router.push('/dashboard/admin')
       } else if (role === 'STAFF') {
         router.push('/dashboard/staff/tasks')
       } else if (role === 'GUEST') {
