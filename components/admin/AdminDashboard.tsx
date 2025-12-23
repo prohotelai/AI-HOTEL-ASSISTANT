@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Cell,
   Line,
@@ -13,6 +13,8 @@ import {
   YAxis,
 } from 'recharts'
 import { AdminDashboardData } from '@/lib/services/adminService'
+import { OnboardingProgressWidget } from '@/components/onboarding/OnboardingProgressWidget'
+import type { OnboardingProgressData } from '@/lib/services/onboarding/onboardingStepService'
 import { format } from 'date-fns'
 
 const PIE_COLORS = ['#2563EB', '#14B8A6', '#F97316', '#F43F5E', '#6366F1']
@@ -93,6 +95,8 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
     []
   )
 
+  const [onboardingProgress, setOnboardingProgress] = useState<OnboardingProgressData | null>(null)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
@@ -124,6 +128,11 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
             subLabel={`of ${data.metrics.knowledgeDocuments} documents`}
           />
         </section>
+
+        {/* Onboarding progress widget - only show if not completed */}
+        {onboardingProgress?.status !== 'COMPLETED' && (
+          <OnboardingProgressWidget onOnboardingChange={setOnboardingProgress} />
+        )}
 
         <section className="grid gap-6 lg:grid-cols-3">
           <div className="bg-white rounded-xl border p-6 lg:col-span-2">

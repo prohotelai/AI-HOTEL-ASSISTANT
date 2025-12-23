@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHotelAdminSignup } from '@/lib/services/adminSignupService'
 import { badRequest, conflict, internalError } from '@/lib/api/errorHandler'
+import { prisma } from '@/lib/prisma'
 
 /**
  * HOTEL ADMIN REGISTRATION ENDPOINT
@@ -13,6 +14,8 @@ import { badRequest, conflict, internalError } from '@/lib/api/errorHandler'
  * Flow:
  * 1. Validate all input fields (name, email, password, hotelName)
  * 2. Check email uniqueness in database
+ *    - If email exists with registrationStatus=IN_PROGRESS → return status with "resume" flag
+ *    - If email exists with registrationStatus=COMPLETED → return conflict error
  * 3. Hash password with bcrypt cost 12 (strong for admin)
  * 4. Create User + Hotel in single transaction:
  *    - User: role=OWNER, hotelId=generated hotel.id, onboardingCompleted=false
@@ -84,6 +87,41 @@ export async function POST(req: NextRequest) {
     if (typeof hotelName !== 'string' || hotelName.trim().length < 2) {
       return badRequest(
         'Hotel name must be at least 2 characters long',
+        { endpoint: '/api/register', method: 'POST' }
+      )
+    }
+
+    // CHECK: Email might already exist with IN_PROGRESS registration
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        registrationStatus: true,
+        hotelId: true,
+      },
+    })
+
+    // If email exists and registration is IN_PROGRESS, return resume response
+    if (existingUser && existingUser.registrationStatus === 'IN_PROGRESS') {
+      return NextResponse.json(
+        {
+          success: false,
+          resumable: true,
+          message: 'Registration already in progress',
+          action: 'resume',
+          userId: existingUser.id,
+          hotelId: existingUser.hotelId,
+          email: existingUser.email,
+        },
+        { status: 200 } // 200 OK, not conflict - this is not an error
+      )
+    }
+
+    // If email exists and registration is COMPLETED, return conflict
+    if (existingUser && existingUser.registrationStatus === 'COMPLETED') {
+      return conflict(
+        'An account with this email already exists and is fully registered',
         { endpoint: '/api/register', method: 'POST' }
       )
     }

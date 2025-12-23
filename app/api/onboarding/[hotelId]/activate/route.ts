@@ -2,52 +2,35 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /**
- * Onboarding Activation API
- * POST /api/onboarding/[hotelId]/activate
+ * DEPRECATED: Old onboarding flow endpoint
+ * 
+ * This endpoint is part of the legacy onboarding flow (welcome, profile, website-scan, etc.)
+ * which has been superseded by the hardened 4-step wizard:
+ * - POST /api/onboarding/steps/hotel-details
+ * - POST /api/onboarding/steps/room-config
+ * - POST /api/onboarding/steps/services-setup
+ * - POST /api/onboarding/steps/finish
+ * 
+ * Use the new endpoints instead.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
-import { completeOnboarding, logOnboardingEvent } from '@/lib/services/onboarding/onboardingService'
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { hotelId: string } }
 ) {
-  try {
-    const token = await getToken({ req })
-    
-    if (!token || token.hotelId !== params.hotelId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
-    }
-
-    // Complete onboarding
-    await completeOnboarding(params.hotelId)
-
-    // Log activation event
-    await logOnboardingEvent(
-      params.hotelId,
-      'finish',
-      'assistant-activated',
-      {
-        activatedAt: new Date().toISOString(),
-        activatedBy: token.id,
-      }
-    )
-
-    return NextResponse.json({
-      success: true,
-      message: 'AI assistant activated successfully',
-      activatedAt: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error('Activation error:', error)
-    return NextResponse.json(
-      { error: 'Activation failed', message: String(error) },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json(
+    {
+      error: 'Deprecated',
+      message: 'This endpoint is no longer supported. Use /api/onboarding/steps/* endpoints instead.',
+      newEndpoints: {
+        hotelDetails: 'POST /api/onboarding/steps/hotel-details',
+        roomConfig: 'POST /api/onboarding/steps/room-config',
+        servicesSetup: 'POST /api/onboarding/steps/services-setup',
+        finish: 'POST /api/onboarding/steps/finish',
+      },
+    },
+    { status: 410 }
+  )
 }

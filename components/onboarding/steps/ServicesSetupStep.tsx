@@ -27,6 +27,7 @@ interface Service {
 interface ServicesSetupStepProps {
   hotelId: string
   onComplete: () => void
+  onSkip?: () => void
   onNext: () => void
   onBack: () => void
 }
@@ -34,6 +35,7 @@ interface ServicesSetupStepProps {
 export default function ServicesSetupStep({
   hotelId,
   onComplete,
+  onSkip,
   onNext,
   onBack,
 }: ServicesSetupStepProps) {
@@ -238,6 +240,16 @@ export default function ServicesSetupStep({
           >
             {saving ? 'Saving...' : 'Save & Continue'}
           </button>
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={saving}
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Skip
+            </button>
+          )}
         </div>
       </form>
     </motion.div>

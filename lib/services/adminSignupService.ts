@@ -129,6 +129,9 @@ export async function createHotelAdminSignup(
         // Set default plan to STARTER
         subscriptionPlan: SubscriptionPlan.STARTER,
         subscriptionStatus: SubscriptionStatus.ACTIVE,
+        // Initialize AI Setup Wizard
+        wizardStatus: 'IN_PROGRESS',
+        wizardStep: 1, // Start at step 1
       }
     })
 
@@ -141,6 +144,12 @@ export async function createHotelAdminSignup(
         role: SystemRole.OWNER,
         hotelId: hotel.id,
         onboardingCompleted: false,
+        // Set registration wizard state to IN_PROGRESS
+        registrationStatus: 'IN_PROGRESS',
+        registrationStep: 'hotel-details', // Start at first step
+        // Initialize AI Setup Wizard on user too
+        wizardStatus: 'IN_PROGRESS',
+        wizardStep: 1,
       }
     })
 

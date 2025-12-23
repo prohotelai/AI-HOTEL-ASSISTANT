@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { completeOnboarding } from '@/lib/services/onboarding/onboardingStepService'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -33,47 +34,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Mark onboarding as completed for both user and hotel (atomic transaction)
+    // Mark onboarding as completed using service layer
     await prisma.$transaction(async (tx) => {
-      // Update user
+      // Update user to mark onboarding completed
       await tx.user.update({
         where: { id: userId },
         data: {
           onboardingCompleted: true,
         }
       })
-
-      // Update hotel status
-      await tx.hotel.update({
-        where: { id: hotelId },
-        data: {} // Hotel update not needed - onboarding progress tracks state
-      })
-
-      // Also initialize onboarding progress record if it exists
-      try {
-        await tx.onboardingProgress.upsert({
-          where: { hotelId },
-          create: {
-            hotelId,
-            currentStep: 'finish',
-            stepsCompleted: ['welcome', 'profile', 'finish'],
-            isCompleted: true,
-            completedAt: new Date(),
-            fastTrackMode: false,
-          },
-          update: {
-            isCompleted: true,
-            completedAt: new Date(),
-          }
-        })
-      } catch (error) {
-        console.warn('OnboardingProgress model may not exist:', error)
-      }
     })
+
+    // Mark the wizard as COMPLETED in onboarding progress
+    const result = await completeOnboarding(hotelId)
 
     return NextResponse.json({
       message: 'Onboarding completed successfully',
       onboardingCompleted: true,
+      progress: result.progress,
     })
   } catch (error) {
     console.error('Complete onboarding error:', error)

@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { format, formatDistanceToNow } from 'date-fns'
 import clsx from 'clsx'
 import { Button } from '@/components/ui/button'
@@ -128,7 +127,6 @@ function renderAuditLabel(audit: TicketAudit) {
 }
 
 export default function TicketDetail({ sessionUser, ticket, tags, teamMembers, permissions }: TicketDetailProps) {
-  const router = useRouter()
   const [details, setDetails] = useState(ticket)
   const [updateForm, setUpdateForm] = useState<UpdateFormState>({
     title: ticket.title,
@@ -198,7 +196,7 @@ export default function TicketDetail({ sessionUser, ticket, tags, teamMembers, p
         slaMinutes: data.slaMinutes ? String(data.slaMinutes) : '',
         dueAt: toInputDate(data.dueAt),
       })
-      router.refresh()
+      // Page will revalidate automatically after successful update
     } catch (error) {
       setUpdateError((error as Error).message)
     } finally {
@@ -239,7 +237,7 @@ export default function TicketDetail({ sessionUser, ticket, tags, teamMembers, p
         audits: prev.audits,
       }))
       setCommentForm({ body: '', visibility: commentForm.visibility })
-      router.refresh()
+      // Page will revalidate automatically after successful update
     } catch (error) {
       setCommentError((error as Error).message)
     } finally {
@@ -266,7 +264,7 @@ export default function TicketDetail({ sessionUser, ticket, tags, teamMembers, p
       const data: TicketDetailData = await response.json()
       setDetails(data)
       setUpdateForm((prev) => ({ ...prev, status: 'CLOSED' }))
-      router.refresh()
+      // Page will revalidate automatically after successful update
     } catch (error) {
       setUpdateError((error as Error).message)
     } finally {
@@ -289,10 +287,12 @@ export default function TicketDetail({ sessionUser, ticket, tags, teamMembers, p
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" onClick={() => router.push('/dashboard/tickets')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to tickets
-        </Button>
+        <a href="/dashboard/tickets" className="inline-flex">
+          <Button variant="ghost">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to tickets
+          </Button>
+        </a>
         <span className="text-xs uppercase tracking-wide text-gray-400">Ticket #{details.id}</span>
       </div>
 

@@ -28,6 +28,7 @@ interface RoomInput {
 interface RoomConfigStepProps {
   hotelId: string
   onComplete: () => void
+  onSkip?: () => void
   onNext: () => void
   onBack: () => void
 }
@@ -35,6 +36,7 @@ interface RoomConfigStepProps {
 export default function RoomConfigStep({
   hotelId,
   onComplete,
+  onSkip,
   onNext,
   onBack,
 }: RoomConfigStepProps) {
@@ -342,6 +344,15 @@ export default function RoomConfigStep({
           >
             {saving ? 'Saving...' : 'Save & Continue'}
           </button>
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Skip
+            </button>
+          )}
         </div>
 
         <p className="text-xs text-gray-500 text-center">

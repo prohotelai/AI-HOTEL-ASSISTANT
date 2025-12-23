@@ -6,7 +6,7 @@
 'use client'
 
 import { ReactNode, useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { CheckCircle2, Circle, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -26,6 +26,7 @@ interface OnboardingLayoutProps {
   children: ReactNode
   currentStep: string
   completedSteps: string[]
+  skippedSteps?: string[]
   onStepChange?: (step: string) => void
 }
 
@@ -33,9 +34,9 @@ export default function OnboardingLayout({
   children,
   currentStep,
   completedSteps,
+  skippedSteps = [],
   onStepChange,
 }: OnboardingLayoutProps) {
-  const router = useRouter()
   const params = useParams()
   const [totalTime, setTotalTime] = useState(0)
 
@@ -80,6 +81,7 @@ export default function OnboardingLayout({
               <div className="space-y-2">
                 {ONBOARDING_STEPS.map((step, index) => {
                   const isCompleted = completedSteps.includes(step.id)
+                  const isSkipped = skippedSteps.includes(step.id)
                   const isCurrent = step.id === currentStep
                   const isAccessible = index <= currentStepIndex
 
@@ -93,11 +95,15 @@ export default function OnboardingLayout({
                           ? 'bg-brand-primary/10 border border-brand-primary'
                           : isCompleted
                           ? 'hover:bg-brand-bg'
+                          : isSkipped
+                          ? 'opacity-60 hover:bg-brand-bg'
                           : 'opacity-50 cursor-not-allowed'
                       }`}
                     >
                       {isCompleted ? (
                         <CheckCircle2 className="w-5 h-5 text-brand-accent flex-shrink-0" />
+                      ) : isSkipped ? (
+                        <Clock className="w-5 h-5 text-brand-muted flex-shrink-0" />
                       ) : (
                         <Circle
                           className={`w-5 h-5 flex-shrink-0 ${
@@ -116,6 +122,7 @@ export default function OnboardingLayout({
                           }`}
                         >
                           {step.label}
+                          {isSkipped && <span className="text-xs ml-1">(Skipped)</span>}
                         </div>
                         {isCurrent && !isCompleted && (
                           <div className="text-xs text-brand-muted">
@@ -130,8 +137,9 @@ export default function OnboardingLayout({
 
               <div className="mt-6 pt-6 border-t border-brand-border">
                 <button
-                  onClick={() => router.push(`/dashboard`)}
-                  className="w-full text-sm text-brand-muted hover:text-brand-text transition-colors"
+                  disabled
+                  className="w-full text-sm text-brand-muted/50 cursor-not-allowed transition-colors"
+                  title="Use the Finish step to complete onboarding and exit"
                 >
                   Save & Exit
                 </button>

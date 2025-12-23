@@ -21,12 +21,14 @@ interface HotelDetailsStepProps {
     website: string | null
   }
   onComplete: () => void
+  onSkip?: () => void
   onNext: () => void
 }
 
 export default function HotelDetailsStep({
   hotelData,
   onComplete,
+  onSkip,
   onNext,
 }: HotelDetailsStepProps) {
   const [formData, setFormData] = useState({
@@ -205,6 +207,15 @@ export default function HotelDetailsStep({
           >
             {saving ? 'Saving...' : 'Save & Continue'}
           </button>
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Skip
+            </button>
+          )}
         </div>
 
         <p className="text-xs text-gray-500 text-center">

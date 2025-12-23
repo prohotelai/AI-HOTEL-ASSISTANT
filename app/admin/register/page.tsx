@@ -69,12 +69,24 @@ export default function RegisterPage() {
         body: JSON.stringify(formData),
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Registration failed')
+      const result = await response.json()
+
+      // Handle resume case - registration already in progress
+      if (response.ok && result.resumable) {
+        console.log('✅ Registration already in progress - resuming:', {
+          hotelId: result.hotelId,
+          userId: result.userId,
+        })
+
+        // Log them in and redirect to onboarding to resume
+        router.push('/admin/login?registered=true&resume=true')
+        return
       }
 
-      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed')
+      }
+
       console.log('✅ Signup successful:', { hotelId: result.hotelId, userId: result.userId })
 
       // Redirect to admin login, which will then redirect to onboarding

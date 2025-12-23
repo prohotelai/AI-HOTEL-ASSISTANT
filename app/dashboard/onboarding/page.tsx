@@ -120,12 +120,9 @@ export default function OnboardingWizard() {
           <h2 className="text-2xl font-bold text-brand-text mb-2">
             Unable to load onboarding
           </h2>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-brand-primary hover:underline"
-          >
-            Return to Dashboard
-          </button>
+          <p className="text-brand-muted">
+            Please refresh the page or contact support if the problem persists.
+          </p>
         </div>
       </div>
     )

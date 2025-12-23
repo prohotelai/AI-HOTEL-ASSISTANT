@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { checkAccess, getDefaultRedirectUrl, type UserContext, type UserRole } from '@/lib/access-control'
 
 /**
  * Authentication Middleware for Multi-Tenant System
@@ -221,187 +222,102 @@ export async function middleware(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl
 
-    // ===== 1. PUBLIC ROUTES - IMMEDIATE BYPASS =====
-    // Rule 1: These routes are always accessible
-    if (isPublicRoute(pathname) || isPublicApiRoute(pathname)) {
-      logAuth('info', 'Public route access', { pathname })
-      return NextResponse.next()
-    }
+    // ===== UNIFIED ACCESS CONTROL =====
+    // Single source of truth for all routing decisions
 
-    // ===== 2. STAFF/GUEST ROUTES - CUSTOM TOKEN CHECK =====
-    // Note: Full validation happens in API routes (no Prisma in Edge Runtime)
-    // This middleware only does presence check
+    // 1. Get session for authenticated users
+    let userContext: UserContext | null = null
 
-    // Staff routes: Check for staff-session cookie or Bearer token
-    if (pathname.startsWith('/staff/chat') || pathname.startsWith('/staff/')) {
-      // ASSERTION: Staff routes MUST have valid session token
-      if (!assertStaffSession(request, pathname)) {
-        logAuth('error', 'ENFORCEMENT: Staff route accessed without valid token', { pathname })
-        // Rule 3: Do NOT redirect - return 401
-        return NextResponse.json(
-          {
-            error: 'Unauthorized',
-            message: 'Staff session token required. Please scan the QR code.',
-            code: 'STAFF_TOKEN_MISSING'
-          },
-          { status: 401 }
-        )
+    const sessionToken = await getSessionSafely(request)
+    if (sessionToken?.sub) {
+      userContext = {
+        userId: sessionToken.sub as string,
+        role: (sessionToken.role as UserRole) || 'GUEST',
+        hotelId: sessionToken.hotelId as string | undefined,
+        isAuthenticated: true,
       }
+    } else {
+      // Check for staff/guest custom tokens
+      const staffToken = request.cookies.get('staff-session')?.value
+      const guestToken = request.cookies.get('guest-session')?.value
 
-      logAuth('info', 'Staff route access granted', { pathname })
-      return NextResponse.next()
-    }
-
-    // Guest routes: Check for guest-session or sessionId
-    if (pathname.startsWith('/guest/chat') || pathname.startsWith('/guest/')) {
-      // ASSERTION: Guest routes MUST have valid session token
-      if (!assertGuestSession(request, pathname)) {
-        logAuth('error', 'ENFORCEMENT: Guest route accessed without valid token', { pathname })
-        // Rule 3: Do NOT redirect - return 401
-        return NextResponse.json(
-          {
-            error: 'Unauthorized',
-            message: 'Guest session token required. Please scan the QR code.',
-            code: 'GUEST_TOKEN_MISSING'
-          },
-          { status: 401 }
-        )
-      }
-
-      logAuth('info', 'Guest route access granted', { pathname })
-      return NextResponse.next()
-    }
-
-    // ===== 3. DASHBOARD ROUTES - NEXTAUTH VALIDATION =====
-    // Rule 2: Requires both authentication AND role matching
-
-    if (isDashboardRoute(pathname)) {
-      const session = await getSessionSafely(request)
-
-      // No session = 401 Unauthorized
-      if (!session || !session.sub) {
-        logAuth('warn', 'Dashboard route accessed without session', {
-          pathname,
-          hasSession: !!session
-        })
-
-        // Rule 4: Return 401/403, not 500
-        if (isApiRoute(pathname)) {
-          return NextResponse.json(
-            {
-              error: 'Unauthorized',
-              message: 'Authentication required'
-            },
-            { status: 401 }
-          )
+      if (staffToken) {
+        // Note: Full validation in API routes (no DB in middleware)
+        userContext = {
+          userId: 'staff-user',
+          role: 'STAFF',
+          isAuthenticated: true,
         }
-
-        // Rule 3: For UI routes, return 401 (client decides redirect)
-        // DO NOT automatically redirect
-        return NextResponse.json(
-          {
-            error: 'Unauthorized',
-            message: 'Please log in to access this page'
-          },
-          { status: 401 }
-        )
+      } else if (guestToken) {
+        userContext = {
+          userId: 'guest-user',
+          role: 'GUEST',
+          guestToken,
+          isAuthenticated: true,
+        }
       }
+    }
 
-      // Extract user info from session
-      const userRole = (session.role as string)?.toUpperCase() || 'GUEST'
-      const hotelId = session.hotelId as string | null
-      const onboardingCompleted = session.onboardingCompleted as boolean | undefined
+    // 2. Check access using unified service
+    const accessCheck = await checkAccess(pathname, userContext)
 
-      logAuth('info', 'Dashboard route session check', {
+    if (!accessCheck.allowed) {
+      logAuth('warn', 'Access denied', {
         pathname,
-        userId: session.sub,
-        userRole,
-        hotelId
+        reason: accessCheck.reason,
+        role: userContext?.role,
+        status: accessCheck.httpStatus,
       })
 
-      // Rule 2: Check role-based access for admin routes
-      if (pathname.startsWith('/admin/')) {
-        // ASSERTION: Admin routes require valid admin session
-        if (!assertAdminSession(session, pathname)) {
-          logAuth('error', 'ENFORCEMENT: Admin route access denied by assertion', { pathname })
-          return NextResponse.json(
-            {
-              error: 'Forbidden',
-              message: 'Admin access denied. Invalid session or missing hotel context.',
-              code: 'ADMIN_ASSERTION_FAILED'
-            },
-            { status: 403 }
-          )
-        }
-
-        logAuth('info', 'Admin route access granted', {
-          pathname,
-          hotelId: session.hotelId,
-          userRole: (session.role as string)?.toUpperCase()
+      // Return appropriate response
+      if (accessCheck.redirectUrl) {
+        return NextResponse.redirect(new URL(accessCheck.redirectUrl, request.url), {
+          status: accessCheck.httpStatus || 303,
         })
-
-        return NextResponse.next()
       }
 
-      // Other dashboard routes (/dashboard, /profile, /settings)
-      if (!hotelId) {
-        logAuth('error', 'Dashboard route missing hotelId', {
-          pathname,
-          userId: session.sub
-        })
-
-        return NextResponse.json(
-          {
-            error: 'Forbidden',
-            message: 'No hotel association found'
-          },
-          { status: 403 }
-        )
-      }
-
-      logAuth('info', 'Dashboard route access granted', {
-        pathname,
-        userRole,
-        hotelId
-      })
-
-      return NextResponse.next()
-    }
-
-    // ===== 4. ALL OTHER ROUTES - ALLOW THROUGH =====
-    logAuth('info', 'Unclassified route access', { pathname })
-    return NextResponse.next()
-  } catch (error) {
-    // Rule 5: Log middleware failures with context
-    const { pathname } = request.nextUrl
-    logAuth('error', 'Middleware error', {
-      pathname,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    })
-
-    // Emergency fallback: Allow public routes even on error
-    if (isPublicRoute(pathname) || isPublicApiRoute(pathname)) {
-      logAuth('info', 'Error recovery: allowing public route', { pathname })
-      return NextResponse.next()
-    }
-
-    // Rule 4: Return 500 for protected routes on error
-    if (isApiRoute(pathname)) {
+      const status = accessCheck.httpStatus || 403
       return NextResponse.json(
         {
-          error: 'Internal Server Error',
-          message: 'Authentication check failed'
+          error: status === 401 ? 'Unauthorized' : 'Forbidden',
+          message: accessCheck.reason || 'Access denied',
         },
-        { status: 500 }
+        { status }
       )
     }
 
-    // UI routes: Return error (do not redirect)
+    logAuth('info', 'Access granted', {
+      pathname,
+      role: userContext?.role,
+    })
+
+    return NextResponse.next()
+  } catch (error) {
+    // Emergency fallback
+    const { pathname } = request.nextUrl
+    logAuth('error', 'Access control error', {
+      pathname,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+
+    // Allow public routes through even on error
+    const publicRoutes = [
+      /^\/$/,
+      /^\/login/,
+      /^\/register/,
+      /^\/pricing/,
+      /^\/api\/auth/,
+    ]
+
+    if (publicRoutes.some((r) => r.test(pathname))) {
+      return NextResponse.next()
+    }
+
+    // Block everything else
     return NextResponse.json(
       {
         error: 'Internal Server Error',
-        message: 'An unexpected error occurred'
+        message: 'Access control check failed',
       },
       { status: 500 }
     )

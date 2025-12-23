@@ -699,15 +699,15 @@ export default function PMSConnectionWizard() {
 
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                       <Button
-                        onClick={() => window.location.href = '/dashboard/admin'}
+                        disabled
                         size="lg"
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-blue-600/50 cursor-not-allowed"
                       >
                         Go to Dashboard
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => window.location.href = '/dashboard/admin/pms'}
+                        disabled
                         size="lg"
                       >
                         <ExternalLink className="w-4 h-4 mr-2" />

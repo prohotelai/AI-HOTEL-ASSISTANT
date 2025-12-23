@@ -23,6 +23,9 @@ model Hotel {
   email   String?
   phone   String?
   address String?
+  city    String?
+  country String?
+  hotelType String? // "Hotel" | "Boutique" | "Aparthotel"
 
   // Widget configuration
   widgetColor String? @default("#3B82F6")
@@ -59,6 +62,11 @@ model Hotel {
   voiceMinutesUsed  Int      @default(0)
   ticketsCreated    Int      @default(0)
   storageUsedGB     Float    @default(0)
+
+  // AI Setup Wizard state (NEW - replaces old OnboardingProgress)
+  wizardStatus      String?   // "IN_PROGRESS" | "COMPLETED" | null
+  wizardStep        Int?      // Current step: 1, 2, 3, 4, or null if completed
+  wizardCompletedAt DateTime? // When wizard was completed
 
   // Multi-tenancy relationships
   users                 User[]
@@ -135,6 +143,16 @@ model User {
   // Onboarding state (for OWNER role)
   onboardingCompleted Boolean @default(false)
 
+  // Registration wizard state (for admin signup flow - OWNER only)
+  registrationStatus OnboardingStatus @default(PENDING) // Tracks wizard completion
+  registrationStep   String?                           // Current step in wizard (e.g., 'hotel-details')
+
+  // AI Setup Wizard state (replaces old onboarding - NEW)
+  // These fields track the new simplified 4-step wizard
+  wizardStatus      String?           // "IN_PROGRESS" | "COMPLETED" | null
+  wizardStep        Int?              // Current step: 1, 2, 3, 4, or null if completed
+  wizardCompletedAt DateTime?         // When wizard was completed
+
   // Staff-specific fields
   staffPassword      String? // Separate password for staff
   mustChangePassword Boolean   @default(false)
@@ -171,6 +189,7 @@ model User {
 
   @@index([email])
   @@index([hotelId])
+  @@index([registrationStatus])
 }
 
 // NextAuth Account model
@@ -1703,22 +1722,23 @@ enum SupportPriority {
 // ONBOARDING WIZARD (Additive Feature)
 // ============================================
 
-// Track onboarding progress per hotel workspace
+// Track onboarding progress per hotel workspace - HARDENED
 model OnboardingProgress {
   id      String @id @default(cuid())
   hotelId String @unique
   hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
-  // Progress tracking
-  currentStep    String  @default("welcome")
-  stepsCompleted Json    @default("[]") // Array of completed step IDs
-  fastTrackMode  Boolean @default(false)
-
-  // Completion status
-  isCompleted Boolean   @default(false)
+  // State machine: PENDING → IN_PROGRESS → COMPLETED
+  status        OnboardingStatus @default(PENDING)
+  currentStep   String?          // Last accessed step (can go back)
+  
+  // Step tracking
+  completedSteps Json    @default("[]") // Array of completed step IDs
+  skippedSteps   Json    @default("[]") // Array of skipped step IDs (can resume)
+  
+  // Completion metadata
   completedAt DateTime?
-  skippedAt   DateTime?
-
+  
   // Session metadata
   totalTimeSpent Int @default(0) // seconds
   lastStepTime   Int @default(0) // seconds on current step
@@ -1727,7 +1747,10 @@ model OnboardingProgress {
   updatedAt DateTime @updatedAt
 
   @@index([hotelId])
-  @@index([isCompleted])
+  @@index([status])
+
+  // Composite index for filtering incomplete onboardings
+  @@index([hotelId, status])
 }
 
 // Service Configuration: Persist enabled/disabled state for hotel AI services

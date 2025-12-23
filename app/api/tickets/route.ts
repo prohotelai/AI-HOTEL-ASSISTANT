@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth'
 import { withPermission } from '@/lib/middleware/rbac'
 import { Permission } from '@/lib/rbac'
 import { listTickets, createTicket } from '@/lib/services/ticketService'
+import { requireFeature } from '@/lib/api/feature-gating'
 // TODO: Re-enable usage tracking in Phase 5.1
 // import { checkTicketLimit, incrementTicketUsage, UsageLimitError } from '@/lib/subscription/usageTracking'
 
@@ -16,6 +17,11 @@ export const GET = withPermission(Permission.TICKETS_VIEW)(async (req: NextReque
 
   try {
     const hotelId = user.hotelId
+    
+    // Check ticket feature availability (advanced-ticketing is available on PRO+ plans)
+    const featureCheck = await requireFeature(hotelId, 'advanced-ticketing')
+    if (featureCheck) return featureCheck
+    
     const data = await listTickets(hotelId!, req.nextUrl.searchParams)
     return NextResponse.json(data)
   } catch (error) {

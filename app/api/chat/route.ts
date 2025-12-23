@@ -15,6 +15,7 @@ import {
   incrementAIMessageUsage,
   UsageLimitError,
 } from '@/lib/subscription/usageTracking'
+import { requireFeature } from '@/lib/api/feature-gating'
 
 const MAX_HISTORY = 12
 
@@ -122,6 +123,10 @@ async function handleChat(req: NextRequest, ctx: AuthContext) {
     if (hotelId !== chatContext.hotelId) {
       return NextResponse.json({ error: 'Forbidden - Hotel access denied' }, { status: 403 })
     }
+
+    // Check AI chat feature availability
+    const featureCheck = await requireFeature(hotelId, 'ai-chat')
+    if (featureCheck) return featureCheck
 
     try {
       await checkAIMessageLimit(hotelId, 1)

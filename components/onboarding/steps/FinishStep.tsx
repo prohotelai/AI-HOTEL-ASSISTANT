@@ -7,7 +7,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, Sparkles, ArrowRight, Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
 interface FinishStepProps {
@@ -16,7 +15,6 @@ interface FinishStepProps {
 }
 
 export default function FinishStep({ hotelId, onComplete }: FinishStepProps) {
-  const router = useRouter()
   const { data: session, update } = useSession()
   const [activating, setActivating] = useState(false)
   const [error, setError] = useState('')
@@ -48,12 +46,8 @@ export default function FinishStep({ hotelId, onComplete }: FinishStepProps) {
       await update()
       
       onComplete()
-
-      // Redirect to dashboard
-      setTimeout(() => {
-        router.push('/dashboard')
-        router.refresh()
-      }, 1500)
+      
+      // Middleware handles redirect to /dashboard/admin based on session update
     } catch (error: any) {
       console.error('Failed to activate:', error)
       setError(error.message || 'Failed to complete onboarding. Please try again.')

@@ -9,7 +9,6 @@ import { Permission } from '@/lib/rbac'
 import { format } from 'date-fns'
 import clsx from 'clsx'
 import { Loader2, MessageCircle, Filter, Plus, RefreshCw } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 
 const statusFilters = ['ALL', 'OPEN', 'IN_PROGRESS', 'WAITING_RESPONSE', 'RESOLVED', 'CLOSED', 'CANCELLED'] as const
 const priorityFilters: Array<'ALL' | TicketPriority> = ['ALL', 'LOW', 'MEDIUM', 'HIGH', 'URGENT']
@@ -105,7 +104,6 @@ export default function TicketsDashboard({
   teamMembers,
   permissions,
 }: TicketsDashboardProps) {
-  const router = useRouter()
   const [tickets, setTickets] = useState(initialTickets.items)
   const [nextCursor, setNextCursor] = useState(initialTickets.nextCursor)
   const [isLoading, setIsLoading] = useState(false)
@@ -208,7 +206,7 @@ export default function TicketsDashboard({
       setTickets((prev) => [ticket, ...prev])
       setShowCreateForm(false)
       setFormValues(defaultFormValues)
-      startTransition(() => router.refresh())
+      // Page will revalidate automatically after successful update
     } catch (error) {
       setFormError((error as Error).message)
     } finally {
@@ -375,13 +373,11 @@ export default function TicketsDashboard({
                     {ticket._count.comments}
                   </td>
                   <td className="px-4 py-3 align-top text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/dashboard/tickets/${ticket.id}`)}
-                    >
-                      View
-                    </Button>
+                    <a href={`/dashboard/tickets/${ticket.id}`}>
+                      <Button variant="outline" size="sm">
+                        View
+                      </Button>
+                    </a>
                   </td>
                 </tr>
               ))}
