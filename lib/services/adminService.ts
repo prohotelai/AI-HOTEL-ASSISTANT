@@ -1,41 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { format, startOfMonth, subMonths } from 'date-fns'
 
-// Stubbed - Booking model not in schema
-enum BookingStatus {
-  PENDING = 'PENDING',
-  CONFIRMED = 'CONFIRMED',
-  CHECKED_IN = 'CHECKED_IN',
-  CHECKED_OUT = 'CHECKED_OUT',
-  CANCELLED = 'CANCELLED',
-  NO_SHOW = 'NO_SHOW'
-}
-
-// Stubbed - Ticket model not in schema
-enum TicketStatus {
-  OPEN = 'OPEN',
-  IN_PROGRESS = 'IN_PROGRESS',
-  ON_HOLD = 'ON_HOLD',
-  RESOLVED = 'RESOLVED',
-  CLOSED = 'CLOSED',
-  CANCELLED = 'CANCELLED'
-}
-
-enum TicketPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  URGENT = 'URGENT'
-}
-
-// Stubbed - KnowledgeBase model not in schema
-enum KnowledgeBaseDocumentStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  READY = 'READY',
-  FAILED = 'FAILED',
-  ARCHIVED = 'ARCHIVED'
-}
+// Import actual enums from Prisma types
+import type { BookingStatus, TicketStatus, TicketPriority } from '@prisma/client'
 
 type ChartDatum = {
   label: string
@@ -77,7 +44,7 @@ type TicketRow = {
 type KnowledgeDocumentRow = {
   id: string
   title: string
-  status: KnowledgeBaseDocumentStatus
+  status: string // Using string since KnowledgeBaseChunk doesn't have status
   updatedAt: string
 }
 
@@ -112,23 +79,33 @@ export type AdminDashboardData = {
 
 type BookingLike = { checkIn: Date; status: BookingStatus }
 type TicketLike = { status: TicketStatus }
-type KnowledgeDocLike = { status: KnowledgeBaseDocumentStatus }
+type KnowledgeDocLike = { status: string }
 
 type TrendOptions = {
   months?: number
 }
 
 const TICKET_ACTIVE_STATUSES = new Set<TicketStatus>([
-  TicketStatus.OPEN,
-  TicketStatus.IN_PROGRESS,
-  TicketStatus.ON_HOLD,
+  'OPEN' as TicketStatus,
+  'IN_PROGRESS' as TicketStatus,
+  'WAITING_RESPONSE' as TicketStatus,
 ])
 
 const BOOKING_ACTIVE_STATUSES = new Set<BookingStatus>([
-  BookingStatus.PENDING,
-  BookingStatus.CONFIRMED,
-  BookingStatus.CHECKED_IN,
+  'PENDING' as BookingStatus,
+  'CONFIRMED' as BookingStatus,
+  'CHECKED_IN' as BookingStatus,
 ])
+
+const KNOWLEDGE_STATUS_VALUES = ['READY', 'PENDING', 'PROCESSING', 'FAILED', 'ARCHIVED']
+const TICKET_STATUS_VALUES: TicketStatus[] = [
+  'OPEN',
+  'IN_PROGRESS',
+  'WAITING_RESPONSE',
+  'RESOLVED',
+  'CLOSED',
+  'CANCELLED',
+] as const
 
 export function buildBookingTrend(bookings: BookingLike[], options: TrendOptions = {}): BookingTrendPoint[] {
   const months = options.months ?? 6
@@ -156,21 +133,21 @@ export function buildBookingTrend(bookings: BookingLike[], options: TrendOptions
 }
 
 export function summarizeTicketStatuses(tickets: TicketLike[]): ChartDatum[] {
-  return Object.values(TicketStatus).map((status) => ({
+  return TICKET_STATUS_VALUES.map((status) => ({
     label: status,
     value: tickets.filter((ticket) => ticket.status === status).length,
   }))
 }
 
 export function summarizeKnowledgeStatuses(docs: KnowledgeDocLike[]): ChartDatum[] {
-  return Object.values(KnowledgeBaseDocumentStatus).map((status) => ({
+  return KNOWLEDGE_STATUS_VALUES.map((status) => ({
     label: status,
     value: docs.filter((doc) => doc.status === status).length,
   }))
 }
 
 export async function getAdminDashboardData(hotelId: string): Promise<AdminDashboardData> {
-  const [hotel, staff] = await Promise.all([
+  const [hotel, staff, tickets, bookings, knowledgeBaseDocuments] = await Promise.all([
     prisma.hotel.findUnique({
       where: { id: hotelId },
       select: {
@@ -191,12 +168,52 @@ export async function getAdminDashboardData(hotelId: string): Promise<AdminDashb
         createdAt: true,
       },
     }),
+    prisma.ticket.findMany({
+      where: { hotelId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
+    prisma.booking.findMany({
+      where: { hotelId },
+      select: {
+        id: true,
+        checkInDate: true,
+        checkOutDate: true,
+        status: true,
+        totalAmount: true,
+        currency: true,
+        guest: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        room: {
+          select: {
+            roomNumber: true,
+          },
+        },
+      },
+      orderBy: { checkInDate: 'desc' },
+      take: 10,
+    }),
+    prisma.knowledgeBaseChunk.findMany({
+      where: { hotelId },
+      select: {
+        id: true,
+        metadata: true,
+        updatedAt: true,
+      },
+      take: 10,
+    }),
   ])
-  
-  // Booking, ticket, and knowledge base models not yet implemented
-  const tickets: any[] = []
-  const bookings: BookingLike[] = []
-  const knowledgeBaseDocuments: KnowledgeDocLike[] = []
 
   if (!hotel) {
     const error = new Error('Hotel not found')
@@ -206,9 +223,6 @@ export async function getAdminDashboardData(hotelId: string): Promise<AdminDashb
 
   const activeTicketCount = tickets.filter((ticket) => TICKET_ACTIVE_STATUSES.has(ticket.status)).length
   const activeBookingCount = bookings.filter((booking) => BOOKING_ACTIVE_STATUSES.has(booking.status)).length
-  const readyDocumentCount = knowledgeBaseDocuments.filter(
-    (doc) => doc.status === KnowledgeBaseDocumentStatus.READY
-  ).length
 
   const metrics: AdminMetrics = {
     totalStaff: staff.length,
@@ -217,12 +231,22 @@ export async function getAdminDashboardData(hotelId: string): Promise<AdminDashb
     openTickets: activeTicketCount,
     totalTickets: tickets.length,
     knowledgeDocuments: knowledgeBaseDocuments.length,
-    readyDocuments: readyDocumentCount,
+    readyDocuments: 0, // Knowledge base chunks don't have a status field
   }
 
-  const bookingTrend = buildBookingTrend(bookings)
+  const bookingTrend = buildBookingTrend(
+    bookings.map((b) => ({
+      checkIn: b.checkInDate,
+      status: b.status,
+    }))
+  )
+  
   const ticketStatusBreakdown = summarizeTicketStatuses(tickets)
-  const knowledgeStatusBreakdown = summarizeKnowledgeStatuses(knowledgeBaseDocuments)
+  const knowledgeStatusBreakdown = summarizeKnowledgeStatuses(
+    knowledgeBaseDocuments.map((doc) => ({
+      status: (doc.metadata as any)?.status || 'READY',
+    }))
+  )
 
   return {
     hotel: {
@@ -242,8 +266,28 @@ export async function getAdminDashboardData(hotelId: string): Promise<AdminDashb
       role: member.role,
       joinedAt: member.createdAt.toISOString(),
     })),
-    bookings: [], // Booking model not implemented
-    tickets: [], // Ticket model not implemented
-    knowledgeBaseDocuments: [], // KnowledgeBase model not implemented
+    bookings: bookings.map((booking) => ({
+      id: booking.id,
+      guestName: `${booking.guest.firstName} ${booking.guest.lastName}`,
+      status: booking.status,
+      checkIn: booking.checkInDate.toISOString(),
+      checkOut: booking.checkOutDate.toISOString(),
+      roomNumber: booking.room?.roomNumber ?? null,
+      totalAmount: booking.totalAmount,
+      currency: booking.currency,
+    })),
+    tickets: tickets.map((ticket) => ({
+      id: ticket.id,
+      title: ticket.title,
+      status: ticket.status,
+      priority: ticket.priority,
+      createdAt: ticket.createdAt.toISOString(),
+    })),
+    knowledgeBaseDocuments: knowledgeBaseDocuments.map((doc) => ({
+      id: doc.id,
+      title: (doc.metadata as any)?.title || 'Untitled',
+      status: (doc.metadata as any)?.status || 'READY',
+      updatedAt: doc.updatedAt.toISOString(),
+    })),
   }
 }
