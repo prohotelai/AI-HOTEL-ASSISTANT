@@ -12,16 +12,16 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           {/* Company Info */}
           <div>
-            <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit" aria-label="AI Hotel Assistant Home">
+            <Link href="/" className="flex items-center gap-3 mb-4 hover:opacity-90 transition-opacity w-fit" aria-label="AI Hotel Assistant Home">
               <Image
                 src="/images/logo.png"
                 alt="AI Hotel Assistant Logo"
-                width={40}
-                height={40}
+                width={48}
+                height={48}
                 className="logo logo-md logo-on-dark"
                 priority
               />
-              <span className="text-xl font-bold text-white tracking-tight">AI Hotel Assistant</span>
+              <span className="text-2xl font-bold text-white tracking-tight">AI Hotel Assistant</span>
             </Link>
             <p className="text-sm text-gray-400 mb-4 leading-relaxed">
               An all-in-one AI-powered hotel operating system for modern properties.
