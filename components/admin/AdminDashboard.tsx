@@ -16,6 +16,7 @@ import { AdminDashboardData } from '@/lib/services/adminService'
 import { OnboardingProgressWidget } from '@/components/onboarding/OnboardingProgressWidget'
 import type { OnboardingProgressData } from '@/lib/services/onboarding/onboardingStepService'
 import { format } from 'date-fns'
+import { AlertCircle, Download, Loader, QrCode, User, Users, Key } from 'lucide-react'
 
 const PIE_COLORS = ['#2563EB', '#14B8A6', '#F97316', '#F43F5E', '#6366F1']
 type TicketStatusKey = AdminDashboardData['tickets'][number]['status'] extends never
@@ -96,6 +97,39 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
   )
 
   const [onboardingProgress, setOnboardingProgress] = useState<OnboardingProgressData | null>(null)
+  const [qrLoading, setQrLoading] = useState(false)
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false)
+  const [staffIdLoading, setStaffIdLoading] = useState(false)
+
+  const handleGenerateQR = async () => {
+    try {
+      setQrLoading(true)
+      const response = await fetch(`/api/admin/qr`, { method: 'POST' })
+      if (response.ok) {
+        const data = await response.json()
+        // Open QR in new window or show modal
+        window.open(`/qr/${data.token}`, 'QR_CODE', 'width=600,height=600')
+      }
+    } catch (error) {
+      console.error('Failed to generate QR:', error)
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  const handleGenerateStaffId = async () => {
+    try {
+      setStaffIdLoading(true)
+      const response = await fetch(`/api/admin/staff/generate-id`, { method: 'POST' })
+      if (response.ok) {
+        setStaffDialogOpen(true)
+      }
+    } catch (error) {
+      console.error('Failed to generate staff ID:', error)
+    } finally {
+      setStaffIdLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -127,6 +161,80 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
             value={data.metrics.readyDocuments}
             subLabel={`of ${data.metrics.knowledgeDocuments} documents`}
           />
+        </section>
+
+        {/* Control Panel - Hotel Management */}
+        <section className="bg-white rounded-xl border p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Hotel Controls</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <ControlCard
+              icon={<QrCode className="w-6 h-6" />}
+              label="Generate QR Code"
+              description="Create guest access QR"
+              onClick={handleGenerateQR}
+              loading={qrLoading}
+              color="blue"
+            />
+            <ControlCard
+              icon={<User className="w-6 h-6" />}
+              label="Generate Staff ID"
+              description="Create staff credentials"
+              onClick={handleGenerateStaffId}
+              loading={staffIdLoading}
+              color="green"
+            />
+            <ControlCard
+              icon={<Users className="w-6 h-6" />}
+              label="Manage Staff"
+              description="Add/edit staff members"
+              onClick={() => window.location.href = '/dashboard/admin/staff'}
+              color="purple"
+            />
+            <ControlCard
+              icon={<Key className="w-6 h-6" />}
+              label="Settings"
+              description="Hotel configuration"
+              onClick={() => window.location.href = '/dashboard/admin/settings'}
+              color="orange"
+            />
+          </div>
+        </section>
+
+        {/* Quick Actions */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="bg-white rounded-xl border p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Quick Downloads
+            </h2>
+            <div className="space-y-2">
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
+                📋 Export Bookings Report
+              </button>
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
+                📊 Export Revenue Report
+              </button>
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
+                👥 Export Staff Directory
+              </button>
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
+                🎫 Export Tickets
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              System Status
+            </h2>
+            <div className="space-y-3">
+              <StatusItem label="Database" status="healthy" />
+              <StatusItem label="QR Service" status="healthy" />
+              <StatusItem label="AI Assistant" status="healthy" />
+              <StatusItem label="Email Service" status="healthy" />
+            </div>
+          </div>
         </section>
 
         {/* Onboarding progress widget - only show if not completed */}
@@ -357,6 +465,79 @@ function EmptyState({ message, compact = false }: EmptyStateProps) {
       }`}
     >
       {message}
+    </div>
+  )
+}
+
+type ControlCardProps = {
+  icon: React.ReactNode
+  label: string
+  description: string
+  onClick: () => void
+  loading?: boolean
+  color?: 'blue' | 'green' | 'purple' | 'orange'
+}
+
+const colorClasses = {
+  blue: 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200',
+  green: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200',
+  purple: 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200',
+  orange: 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200',
+}
+
+function ControlCard({
+  icon,
+  label,
+  description,
+  onClick,
+  loading = false,
+  color = 'blue',
+}: ControlCardProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className={`p-4 rounded-lg border text-left transition-colors ${colorClasses[color]} ${
+        loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5">
+          {loading ? <Loader className="w-5 h-5 animate-spin" /> : icon}
+        </div>
+        <div className="flex-1">
+          <p className="font-semibold text-sm">{label}</p>
+          <p className="text-xs opacity-75 mt-1">{description}</p>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+type StatusItemProps = {
+  label: string
+  status: 'healthy' | 'warning' | 'error'
+}
+
+function StatusItem({ label, status }: StatusItemProps) {
+  const statusColors = {
+    healthy: 'bg-emerald-100 text-emerald-700',
+    warning: 'bg-amber-100 text-amber-700',
+    error: 'bg-rose-100 text-rose-700',
+  }
+
+  const statusDots = {
+    healthy: '🟢',
+    warning: '🟡',
+    error: '🔴',
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-600">{label}</span>
+      <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[status]}`}>
+        {statusDots[status]} {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
     </div>
   )
 }
