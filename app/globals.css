@@ -122,37 +122,37 @@
 
 .logo-hover {
   @apply transition-all duration-300 cursor-pointer;
-  
-  &:hover {
-    transform: translateY(-2px);
-    filter: drop-shadow(0 4px 12px var(--logo-glow-color));
-  }
-  
-  &:active {
-    transform: translateY(0px);
-    filter: drop-shadow(0 2px 8px var(--logo-glow-color-soft));
-  }
+}
+
+.logo-hover:hover {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 4px 12px var(--logo-glow-color));
+}
+
+.logo-hover:active {
+  transform: translateY(0px);
+  filter: drop-shadow(0 2px 8px var(--logo-glow-color-soft));
 }
 
 .logo-hover-scale {
   @apply transition-all duration-300 cursor-pointer;
-  
-  &:hover {
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 12px var(--logo-glow-color));
-  }
-  
-  &:active {
-    transform: scale(0.98);
-  }
+}
+
+.logo-hover-scale:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 12px var(--logo-glow-color));
+}
+
+.logo-hover-scale:active {
+  transform: scale(0.98);
 }
 
 .logo-hover-glow {
   @apply transition-all duration-300 cursor-pointer;
-  
-  &:hover {
-    filter: drop-shadow(0 0 20px var(--logo-glow-color));
-  }
+}
+
+.logo-hover-glow:hover {
+  filter: drop-shadow(0 0 20px var(--logo-glow-color));
 }
 
 /* ============================================
@@ -269,17 +269,41 @@
    ============================================ */
 
 .logo-nav {
-  @apply logo logo-md logo-on-light logo-hover;
+  width: var(--logo-size-md);
+  height: auto;
+  display: block;
+  @apply transition-all duration-300 cursor-pointer;
+  filter: drop-shadow(0 0 4px var(--logo-glow-color-soft));
+}
+
+.logo-nav:hover {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 4px 12px var(--logo-glow-color));
 }
 
 .logo-hero {
-  @apply logo logo-xl logo-glow-intense logo-float;
+  width: var(--logo-size-xl);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 20px var(--logo-glow-color)) 
+          drop-shadow(0 0 40px rgba(11, 95, 255, 0.2));
+  animation: logo-float 3s ease-in-out infinite;
 }
 
 .logo-footer {
-  @apply logo logo-sm logo-on-dark;
+  width: var(--logo-size-sm);
+  height: auto;
+  display: block;
+  filter: brightness(1.05) drop-shadow(0 0 8px var(--logo-glow-color));
 }
 
 .logo-button {
-  @apply logo logo-sm logo-hover-glow;
+  width: var(--logo-size-sm);
+  height: auto;
+  display: block;
+  @apply transition-all duration-300 cursor-pointer;
+}
+
+.logo-button:hover {
+  filter: drop-shadow(0 0 20px var(--logo-glow-color));
 }
