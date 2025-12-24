@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Mail, Phone, MapPin } from 'lucide-react'
 import Container from './Container'
 
@@ -11,10 +12,16 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           {/* Company Info */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-3xl" aria-hidden="true">🏨</span>
+            <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit">
+              <Image
+                src="/images/logo-ai-assistant.png"
+                alt="AI Hotel Assistant Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain"
+              />
               <span className="text-xl font-bold text-white tracking-tight">AI Hotel Assistant</span>
-            </div>
+            </Link>
             <p className="text-sm text-gray-400 mb-4 leading-relaxed">
               An all-in-one AI-powered hotel operating system for modern properties.
             </p>
