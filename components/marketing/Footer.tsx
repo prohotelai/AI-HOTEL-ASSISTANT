@@ -14,7 +14,7 @@ export default function Footer() {
           <div>
             <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit" aria-label="AI Hotel Assistant Home">
               <Image
-                src="/images/ai-hotel-asistant.png"
+                src="/images/logo-ai-assistant.png"
                 alt="AI Hotel Assistant Logo"
                 width={40}
                 height={40}
