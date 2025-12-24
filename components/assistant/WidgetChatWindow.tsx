@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Send, X, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,16 +62,28 @@ export function WidgetChatWindow() {
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
-          <h3 className="font-semibold">AI Assistant</h3>
+      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-brand-primary to-brand-primary-dark text-white">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/images/logo.png"
+            alt="AI Assistant"
+            width={32}
+            height={32}
+            className="rounded-full bg-white/10 p-1"
+          />
+          <div>
+            <h3 className="font-semibold text-sm">AI Hotel Assistant</h3>
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-xs opacity-90">Online</span>
+            </div>
+          </div>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={closeWidget}
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 p-0 hover:bg-white/20 text-white"
         >
           <X className="h-4 w-4" />
         </Button>

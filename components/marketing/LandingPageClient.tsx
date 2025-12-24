@@ -23,7 +23,8 @@ import {
   Phone,
   MapPin,
   Star,
-  Quote
+  Quote,
+  Book
 } from 'lucide-react'
 import Container from '@/components/marketing/Container'
 import Section from '@/components/marketing/Section'
@@ -542,6 +543,141 @@ export function LandingPageClient() {
               <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </Link>
           </div>
+        </Container>
+      </Section>
+
+      {/* AI Assistant Guide Section */}
+      <Section background="white">
+        <Container>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-12"
+          >
+            <div className="inline-flex items-center gap-2 bg-brand-primary/10 text-brand-primary px-4 py-2 rounded-full text-sm font-semibold mb-4">
+              <Brain className="w-4 h-4" />
+              Need Help?
+            </div>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-brand-text mb-4 tracking-tight">
+              Meet Your AI Assistant
+            </h2>
+            <p className="text-lg md:text-xl text-brand-muted max-w-3xl mx-auto">
+              Get instant answers, explore features, and navigate the platform with our intelligent guide
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Floating Widget Info */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="bg-gradient-to-br from-brand-primary/5 to-brand-accent/5 rounded-2xl p-8 border border-brand-border hover:border-brand-primary/30 transition-all duration-300"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-primary to-brand-primary-dark flex items-center justify-center shadow-lg">
+                    <Image
+                      src="/images/logo.png"
+                      alt="AI Assistant"
+                      width={36}
+                      height={36}
+                    />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-brand-text">Floating Widget</h3>
+                  <p className="text-sm text-brand-muted">Available on every page</p>
+                </div>
+              </div>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-brand-muted">Click the AI assistant icon in the bottom-right corner</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-brand-muted">Ask any question about features, setup, or usage</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-brand-muted">Get instant AI-powered responses 24/7</span>
+                </li>
+              </ul>
+            </motion.div>
+
+            {/* Full Guide Page Info */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="bg-gradient-to-br from-brand-accent/5 to-brand-primary/5 rounded-2xl p-8 border border-brand-border hover:border-brand-accent/30 transition-all duration-300"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-brand-accent to-brand-primary flex items-center justify-center shadow-lg">
+                  <Book className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-brand-text">Full Guide Module</h3>
+                  <p className="text-sm text-brand-muted">Comprehensive assistance</p>
+                </div>
+              </div>
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-brand-accent flex-shrink-0 mt-0.5" />
+                  <span className="text-brand-muted">Detailed platform documentation and guides</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-brand-accent flex-shrink-0 mt-0.5" />
+                  <span className="text-brand-muted">Step-by-step setup instructions</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-brand-accent flex-shrink-0 mt-0.5" />
+                  <span className="text-brand-muted">Interactive Q&A with quick action buttons</span>
+                </li>
+              </ul>
+              <Link
+                href="/assistant"
+                className="inline-flex items-center justify-center gap-2 w-full bg-brand-accent text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-accent/90 transition-all duration-300 shadow-md hover:shadow-lg"
+              >
+                Open Full Guide
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Try it now banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="mt-12 text-center bg-gradient-to-r from-brand-primary to-brand-accent rounded-2xl p-8 text-white"
+          >
+            <h3 className="text-2xl font-bold mb-3">Try it now!</h3>
+            <p className="text-white/90 mb-6 max-w-2xl mx-auto">
+              The AI assistant is live on this page. Look for the glowing icon in the bottom-right corner and ask anything about our platform.
+            </p>
+            <div className="flex items-center justify-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+                <span>Online & Ready</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                <span>Instant Responses</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                <span>Available 24/7</span>
+              </div>
+            </div>
+          </motion.div>
         </Container>
       </Section>
 

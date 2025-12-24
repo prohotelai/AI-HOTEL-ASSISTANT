@@ -1,6 +1,7 @@
 'use client'
 
-import { MessageCircle, X } from 'lucide-react'
+import { X } from 'lucide-react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { useAssistant } from './AssistantProvider'
 import { cn } from '@/lib/utils'
@@ -13,16 +14,25 @@ export function WidgetButton() {
       onClick={toggleWidget}
       size="lg"
       className={cn(
-        "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg",
-        "transition-all duration-200 hover:scale-110",
-        isOpen && "rotate-90"
+        "fixed bottom-6 right-6 z-50 h-16 w-16 rounded-full shadow-xl",
+        "transition-all duration-300 hover:scale-110 hover:shadow-2xl",
+        "bg-gradient-to-br from-brand-primary to-brand-primary-dark",
+        "border-2 border-white/20",
+        isOpen && "scale-95"
       )}
-      aria-label={isOpen ? "Close assistant" : "Open assistant"}
+      aria-label={isOpen ? "Close assistant" : "Open AI assistant"}
     >
       {isOpen ? (
-        <X className="h-6 w-6" />
+        <X className="h-7 w-7" />
       ) : (
-        <MessageCircle className="h-6 w-6" />
+        <Image
+          src="/images/logo.png"
+          alt="AI Assistant"
+          width={36}
+          height={36}
+          className="transition-transform group-hover:scale-110"
+          priority
+        />
       )}
     </Button>
   )
