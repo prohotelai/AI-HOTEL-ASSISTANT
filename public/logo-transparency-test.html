@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logo Transparency Test</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin: 2rem 0;
+    }
+    .test-card {
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .bg-white { background: white; }
+    .bg-dark { background: #1a1a1a; color: white; }
+    .bg-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .bg-pattern { 
+      background-image: 
+        repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), 
+        repeating-linear-gradient(45deg, #ccc 25%, #eee 25%, #eee 75%, #ccc 75%, #ccc);
+      background-position: 0 0, 10px 10px;
+      background-size: 20px 20px;
+    }
+    .logo-img {
+      max-width: 200px;
+      height: auto;
+      margin: 1rem 0;
+    }
+    h1 { color: #333; margin-bottom: 0.5rem; }
+    p { color: #666; margin-top: 0; }
+    h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Logo Transparency Test</h1>
+  <p>Visual verification of transparent logo on various backgrounds</p>
+
+  <h2>✅ Transparent PNG (logo.png - 512x512)</h2>
+  <div class="test-grid">
+    <div class="test-card bg-white">
+      <h3>White Background</h3>
+      <img src="/images/logo.png" alt="Logo on white" class="logo-img">
+    </div>
+    <div class="test-card bg-dark">
+      <h3>Dark Background</h3>
+      <img src="/images/logo.png" alt="Logo on dark" class="logo-img">
+    </div>
+    <div class="test-card bg-gradient">
+      <h3>Gradient Background</h3>
+      <img src="/images/logo.png" alt="Logo on gradient" class="logo-img">
+    </div>
+    <div class="test-card bg-pattern">
+      <h3>Pattern Background (Transparency Check)</h3>
+      <img src="/images/logo.png" alt="Logo on pattern" class="logo-img">
+    </div>
+  </div>
+
+  <h2>✅ Transparent WebP (logo.webp)</h2>
+  <div class="test-grid">
+    <div class="test-card bg-white">
+      <h3>White Background</h3>
+      <img src="/images/logo.webp" alt="Logo WebP on white" class="logo-img">
+    </div>
+    <div class="test-card bg-dark">
+      <h3>Dark Background</h3>
+      <img src="/images/logo.webp" alt="Logo WebP on dark" class="logo-img">
+    </div>
+    <div class="test-card bg-gradient">
+      <h3>Gradient Background</h3>
+      <img src="/images/logo.webp" alt="Logo WebP on gradient" class="logo-img">
+    </div>
+    <div class="test-card bg-pattern">
+      <h3>Pattern Background (Transparency Check)</h3>
+      <img src="/images/logo.webp" alt="Logo WebP on pattern" class="logo-img">
+    </div>
+  </div>
+
+  <h2>📊 Technical Details</h2>
+  <div class="test-card bg-white">
+    <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+      <li><strong>Original:</strong> logo-ai-assistant.png (1536x1024, RGB with white background)</li>
+      <li><strong>Processed:</strong> logo-ai-assistant-transparent.png (white removed with -fuzz 10%)</li>
+      <li><strong>Optimized PNG:</strong> logo.png (512x512, centered, transparent)</li>
+      <li><strong>WebP:</strong> logo.webp (512x512, quality 95, 20.9 KB)</li>
+      <li><strong>Method:</strong> ImageMagick convert -transparent white with 10% fuzz tolerance</li>
+    </ul>
+  </div>
+</body>
+</html>

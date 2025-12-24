@@ -15,7 +15,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" aria-label="AI Hotel Assistant Home">
             <Image
-              src="/images/logo-ai-assistant.png"
+              src="/images/logo.png"
               alt="AI Hotel Assistant Logo"
               width={40}
               height={40}
