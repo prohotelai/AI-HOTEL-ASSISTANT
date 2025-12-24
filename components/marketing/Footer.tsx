@@ -12,14 +12,28 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           {/* Company Info */}
           <div>
-            <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit">
-              <Image
-                src="/images/logo-ai-assistant.png"
-                alt="AI Hotel Assistant Logo"
-                width={40}
-                height={40}
-                className="w-10 h-10 object-contain"
-              />
+            <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit" aria-label="AI Hotel Assistant Home">
+              <svg 
+                width="40" 
+                height="40" 
+                viewBox="0 0 64 64" 
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-10 h-10"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="footerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{stopColor:'#3b82f6',stopOpacity:1}} />
+                    <stop offset="100%" style={{stopColor:'#2563eb',stopOpacity:1}} />
+                  </linearGradient>
+                </defs>
+                <rect x="16" y="12" width="32" height="28" rx="4" fill="url(#footerGradient)"/>
+                <rect x="22" y="18" width="4" height="6" rx="2" fill="white" opacity="0.9"/>
+                <rect x="38" y="18" width="4" height="6" rx="2" fill="white" opacity="0.9"/>
+                <path d="M 26 30 Q 32 32 38 30" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.7"/>
+                <rect x="20" y="40" width="24" height="18" rx="3" fill="url(#footerGradient)" opacity="0.8"/>
+                <circle cx="32" cy="48" r="2" fill="#10b981"/>
+              </svg>
               <span className="text-xl font-bold text-white tracking-tight">AI Hotel Assistant</span>
             </Link>
             <p className="text-sm text-gray-400 mb-4 leading-relaxed">
