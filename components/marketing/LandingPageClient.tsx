@@ -316,9 +316,9 @@ export function LandingPageClient() {
             >
               <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
                 <Image
-                  src="/images/ai-hotel-hero.png"
+                  src="/images/ai-hotel-asistant.png"
                   alt="AI Hotel Dashboard Preview"
-                  width={600}
+                  width={800}
                   height={600}
                   priority
                   className="w-full h-auto object-cover"
