@@ -13,13 +13,14 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" aria-label="AI Hotel Assistant Home">
             <Image
-              src="/images/logo-ai-assistant.png"
+              src="/images/ai-hotel-asistant.png"
               alt="AI Hotel Assistant Logo"
               width={40}
               height={40}
-              className="w-10 h-10 object-contain"
+              className="logo logo-md logo-on-light"
+              priority
             />
             <span className="text-xl font-bold text-brand-text tracking-tight">AI Hotel Assistant</span>
           </Link>

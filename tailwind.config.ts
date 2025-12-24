@@ -37,6 +37,9 @@ const config: Config = {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.5s ease-out',
         'scale-in': 'scaleIn 0.3s ease-out',
+        'logo-float': 'logo-float 3s ease-in-out infinite',
+        'logo-pulse': 'logo-pulse 2s ease-in-out infinite',
+        'logo-spin': 'logo-spin-slow 20s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -51,6 +54,32 @@ const config: Config = {
           '0%': { transform: 'scale(0.95)', opacity: '0' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
+        'logo-float': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-4px)' },
+        },
+        'logo-pulse': {
+          '0%, 100%': { opacity: '1', filter: 'drop-shadow(0 0 6px rgba(11, 95, 255, 0.15))' },
+          '50%': { opacity: '0.8', filter: 'drop-shadow(0 0 12px rgba(11, 95, 255, 0.3))' },
+        },
+        'logo-spin-slow': {
+          'from': { transform: 'rotate(0deg)' },
+          'to': { transform: 'rotate(360deg)' },
+        },
+      },
+      // Logo-specific Tailwind utilities
+      width: {
+        'logo-xs': 'var(--logo-size-xs, 24px)',
+        'logo-sm': 'var(--logo-size-sm, 32px)',
+        'logo-md': 'var(--logo-size-md, 40px)',
+        'logo-lg': 'var(--logo-size-lg, 64px)',
+        'logo-xl': 'var(--logo-size-xl, 96px)',
+      },
+      dropShadow: {
+        'logo-glow': '0 0 12px rgba(11, 95, 255, 0.3)',
+        'logo-glow-soft': '0 0 6px rgba(11, 95, 255, 0.15)',
+        'logo-glow-accent': '0 0 12px rgba(0, 209, 178, 0.3)',
+        'logo-glow-intense': '0 0 20px rgba(11, 95, 255, 0.3), 0 0 40px rgba(11, 95, 255, 0.15)',
       },
     },
   },

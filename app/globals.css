@@ -1,3 +1,285 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================
+   LOGO STYLING SYSTEM - CSS Variables & Classes
+   Work with existing logo assets only
+   ============================================ */
+
+/* Brand Color Variables - Match existing logo colors */
+:root {
+  /* Logo Primary Colors */
+  --logo-primary: #0B5FFF;
+  --logo-primary-dark: #0A52E0;
+  --logo-primary-light: #3D7FFF;
+  
+  /* Logo Accent Color */
+  --logo-accent: #00D1B2;
+  --logo-accent-dark: #00B89C;
+  
+  /* Neutral colors for text and backgrounds */
+  --logo-dark: #0B1220;
+  --logo-light: #FFFFFF;
+  --logo-text: #111827;
+  --logo-muted: #6B7280;
+  
+  /* Logo Sizing Scale */
+  --logo-size-xs: 24px;
+  --logo-size-sm: 32px;
+  --logo-size-md: 40px;
+  --logo-size-lg: 64px;
+  --logo-size-xl: 96px;
+  
+  /* Glow Effects */
+  --logo-glow-color: rgba(11, 95, 255, 0.3);
+  --logo-glow-color-soft: rgba(11, 95, 255, 0.15);
+  --logo-glow-color-accent: rgba(0, 209, 178, 0.3);
+  
+  /* Transitions */
+  --logo-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --logo-glow-color: rgba(61, 127, 255, 0.4);
+    --logo-glow-color-soft: rgba(61, 127, 255, 0.2);
+  }
+}
+
+/* ============================================
+   BASE LOGO CLASSES
+   ============================================ */
+
+.logo {
+  @apply transition-all duration-300;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+}
+
+.logo-wrapper {
+  @apply inline-flex items-center gap-2;
+}
+
+/* Logo Size Variants */
+.logo-xs {
+  width: var(--logo-size-xs);
+  height: auto;
+}
+
+.logo-sm {
+  width: var(--logo-size-sm);
+  height: auto;
+}
+
+.logo-md {
+  width: var(--logo-size-md);
+  height: auto;
+}
+
+.logo-lg {
+  width: var(--logo-size-lg);
+  height: auto;
+}
+
+.logo-xl {
+  width: var(--logo-size-xl);
+  height: auto;
+}
+
+/* ============================================
+   GLOW & SHADOW EFFECTS
+   ============================================ */
+
+.logo-glow {
+  filter: drop-shadow(0 0 12px var(--logo-glow-color));
+  transition: var(--logo-transition);
+}
+
+.logo-glow-soft {
+  filter: drop-shadow(0 0 6px var(--logo-glow-color-soft));
+  transition: var(--logo-transition);
+}
+
+.logo-glow-accent {
+  filter: drop-shadow(0 0 12px var(--logo-glow-color-accent));
+  transition: var(--logo-transition);
+}
+
+/* Intensive glow for hero sections */
+.logo-glow-intense {
+  filter: drop-shadow(0 0 20px var(--logo-glow-color)) 
+          drop-shadow(0 0 40px rgba(11, 95, 255, 0.2));
+  transition: var(--logo-transition);
+}
+
+/* ============================================
+   HOVER & INTERACTIVE STATES
+   ============================================ */
+
+.logo-hover {
+  @apply transition-all duration-300 cursor-pointer;
+  
+  &:hover {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 4px 12px var(--logo-glow-color));
+  }
+  
+  &:active {
+    transform: translateY(0px);
+    filter: drop-shadow(0 2px 8px var(--logo-glow-color-soft));
+  }
+}
+
+.logo-hover-scale {
+  @apply transition-all duration-300 cursor-pointer;
+  
+  &:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 12px var(--logo-glow-color));
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.logo-hover-glow {
+  @apply transition-all duration-300 cursor-pointer;
+  
+  &:hover {
+    filter: drop-shadow(0 0 20px var(--logo-glow-color));
+  }
+}
+
+/* ============================================
+   BACKGROUND VARIANTS
+   ============================================ */
+
+/* For dark backgrounds */
+.logo-on-dark {
+  @apply invert-0;
+  filter: brightness(1.05) drop-shadow(0 0 8px var(--logo-glow-color));
+}
+
+/* For light backgrounds */
+.logo-on-light {
+  @apply brightness-100;
+  filter: drop-shadow(0 0 4px var(--logo-glow-color-soft));
+}
+
+/* High contrast mode */
+.logo-high-contrast {
+  filter: contrast(1.2) drop-shadow(0 0 6px var(--logo-glow-color));
+}
+
+/* ============================================
+   ANIMATION CLASSES
+   ============================================ */
+
+@keyframes logo-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes logo-pulse {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px var(--logo-glow-color-soft));
+  }
+  50% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 12px var(--logo-glow-color));
+  }
+}
+
+@keyframes logo-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.logo-float {
+  animation: logo-float 3s ease-in-out infinite;
+}
+
+.logo-pulse {
+  animation: logo-pulse 2s ease-in-out infinite;
+}
+
+.logo-spin {
+  animation: logo-spin-slow 20s linear infinite;
+}
+
+/* ============================================
+   RESPONSIVE LOGO SIZING
+   ============================================ */
+
+@media (max-width: 768px) {
+  .logo-responsive {
+    width: var(--logo-size-sm);
+  }
+}
+
+@media (min-width: 768px) {
+  .logo-responsive {
+    width: var(--logo-size-md);
+  }
+}
+
+@media (min-width: 1024px) {
+  .logo-responsive {
+    width: var(--logo-size-lg);
+  }
+}
+
+/* Icon-only mode for small screens */
+@media (max-width: 640px) {
+  .logo-with-text {
+    display: none;
+  }
+  
+  .logo-icon-only {
+    display: inline-block;
+  }
+}
+
+@media (min-width: 641px) {
+  .logo-icon-only {
+    display: none;
+  }
+  
+  .logo-with-text {
+    display: inline-block;
+  }
+}
+
+/* ============================================
+   UTILITY COMBINATIONS
+   ============================================ */
+
+.logo-nav {
+  @apply logo logo-md logo-on-light logo-hover;
+}
+
+.logo-hero {
+  @apply logo logo-xl logo-glow-intense logo-float;
+}
+
+.logo-footer {
+  @apply logo logo-sm logo-on-dark;
+}
+
+.logo-button {
+  @apply logo logo-sm logo-hover-glow;
+}

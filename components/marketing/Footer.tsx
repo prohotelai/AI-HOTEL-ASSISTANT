@@ -12,13 +12,14 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           {/* Company Info */}
           <div>
-            <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit">
+            <Link href="/" className="flex items-center gap-2 mb-4 hover:opacity-90 transition-opacity w-fit" aria-label="AI Hotel Assistant Home">
               <Image
-                src="/images/logo-ai-assistant.png"
+                src="/images/ai-hotel-asistant.png"
                 alt="AI Hotel Assistant Logo"
                 width={40}
                 height={40}
-                className="w-10 h-10 object-contain"
+                className="logo logo-md logo-on-dark"
+                priority
               />
               <span className="text-xl font-bold text-white tracking-tight">AI Hotel Assistant</span>
             </Link>
