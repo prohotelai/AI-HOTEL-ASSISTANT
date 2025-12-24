@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import type { LucideIcon } from 'lucide-react'
 import {
   MessageSquare,
@@ -313,13 +314,15 @@ export function LandingPageClient() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative order-first lg:order-last mt-8 lg:mt-0"
             >
-              <div className="aspect-square rounded-2xl bg-gradient-to-br from-brand-primary/20 to-brand-accent/20 border-2 border-white/10 flex items-center justify-center shadow-2xl backdrop-blur-sm">
-                <div className="text-center p-8">
-                  <div className="text-6xl mb-4" aria-hidden="true">
-                    🏨
-                  </div>
-                  <p className="text-gray-300 font-medium">AI Hotel Dashboard Preview</p>
-                </div>
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
+                <Image
+                  src="/images/ai-hotel-hero.png"
+                  alt="AI Hotel Dashboard Preview"
+                  width={600}
+                  height={600}
+                  priority
+                  className="w-full h-auto object-cover"
+                />
               </div>
               <motion.div
                 animate={{ y: [0, -10, 0] }}
