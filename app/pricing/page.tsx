@@ -177,8 +177,8 @@ export default function PricingPage() {
     <>
       <Navbar />
       <main>
-        {/* Hero Section */}
-        <Section background="white" className="pt-20 pb-16 md:pt-24 md:pb-20">
+        {/* Hero Section - Dark Theme */}
+        <Section background="white" className="pt-20 pb-16 md:pt-24 md:pb-20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-850">
           <Container>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -186,10 +186,10 @@ export default function PricingPage() {
               transition={{ duration: 0.6 }}
               className="text-center"
             >
-              <h1 className="mb-6 text-4xl font-semibold tracking-tight text-brand-text md:text-5xl lg:text-6xl">
+              <h1 className="mb-6 text-4xl font-semibold tracking-tight text-white md:text-5xl lg:text-6xl">
                 Simple, Transparent Pricing
               </h1>
-              <p className="mx-auto mb-8 max-w-3xl text-lg text-brand-muted md:text-xl">
+              <p className="mx-auto mb-8 max-w-3xl text-lg text-gray-300 md:text-xl">
                 Choose a plan that scales with your property. From boutique hotels to large resorts,
                 we have the perfect solution for you.
               </p>
@@ -219,169 +219,201 @@ export default function PricingPage() {
           </Container>
         </Section>
 
-        {/* Room-Based Limits */}
+        {/* Simplified Feature Comparison - Light Table */}
         <Section background="gray">
           <Container>
             <SectionHeader
-              subtitle="Room-Based Plans"
-              title="Pricing Based on Your Property Size"
-              description="Our plans are designed to match your hotel's capacity and operational needs"
+              subtitle="Compare Plans"
+              title="Find Your Perfect Plan"
+              description="See what's included in each tier"
               centered
             />
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
-              {pricingPlans.map((plan, index) => (
-                <motion.div
-                  key={plan.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-50px' }}
-                  transition={{ duration: 0.4, delay: index * 0.05 }}
-                  className="rounded-2xl border border-brand-border bg-white p-6 text-center shadow-sm"
-                >
-                  <div className="mb-4 flex justify-center">
-                    {plan.name === 'Starter' && <Building2 className="h-8 w-8 text-brand-muted" />}
-                    {plan.name === 'Pro' && <Building2 className="h-8 w-8 text-brand-primary" />}
-                    {plan.name === 'Pro Plus' && <Zap className="h-8 w-8 text-brand-primary" />}
-                    {plan.name === 'Enterprise Lite' && <Zap className="h-8 w-8 text-brand-accent" />}
-                    {plan.name === 'Resort / Enterprise Plus' && <Crown className="h-8 w-8 text-yellow-500" />}
-                  </div>
-                  <h3 className="mb-2 text-xl font-semibold text-brand-text">{plan.name}</h3>
-                  <p className="text-sm text-brand-muted">{plan.roomLimit}</p>
-                </motion.div>
-              ))}
+            
+            {/* Core Features Comparison */}
+            <div className="space-y-12">
+              {/* Core Features */}
+              <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+                <div className="bg-brand-primary text-white px-6 py-4">
+                  <h3 className="text-xl font-semibold">Core Features</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 w-1/3">Feature</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Starter</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Pro</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Pro Plus</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Enterprise</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">AI Chat Assistant</td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                      </tr>
+                      <tr className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">Voice Assistant</td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                      </tr>
+                      <tr className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">24/7 Support</td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                      </tr>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">PMS Integration</td>
+                        <td className="px-6 py-4 text-center text-xs text-gray-600">Basic</td>
+                        <td className="px-6 py-4 text-center text-xs font-semibold text-green-600">Full</td>
+                        <td className="px-6 py-4 text-center text-xs font-semibold text-green-600">Full</td>
+                        <td className="px-6 py-4 text-center text-xs font-semibold text-green-600">Enterprise</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Support & Add-ons */}
+              <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+                <div className="bg-brand-accent text-white px-6 py-4">
+                  <h3 className="text-xl font-semibold">Support & Integrations</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 w-1/3">Feature</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Starter</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Pro</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Pro Plus</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Enterprise</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">Email Support</td>
+                        <td className="px-6 py-4 text-center text-xs text-gray-600">48h</td>
+                        <td className="px-6 py-4 text-center text-xs text-gray-600">24h</td>
+                        <td className="px-6 py-4 text-center text-xs text-gray-600">12h</td>
+                        <td className="px-6 py-4 text-center text-xs font-semibold text-green-600">1h</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">Chat Support</td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                      </tr>
+                      <tr className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">API Access</td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                      </tr>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">Dedicated Manager</td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><X className="mx-auto h-5 w-5 text-gray-300" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                        <td className="px-6 py-4 text-center"><Check className="mx-auto h-5 w-5 text-green-600" /></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </Container>
         </Section>
 
-        {/* Feature Comparison Table */}
+        {/* Add-Ons Section */}
         <Section background="white">
           <Container>
             <SectionHeader
-              subtitle="Feature Comparison"
-              title="Compare All Plans"
-              description="See what's included in each plan at a glance"
-              centered
-            />
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-brand-border">
-                    <th className="px-4 py-4 text-left text-sm font-semibold text-brand-text">Feature</th>
-                    <th className="px-4 py-4 text-center text-sm font-semibold text-brand-text">Starter</th>
-                    <th className="px-4 py-4 text-center text-sm font-semibold text-brand-text">Pro</th>
-                    <th className="px-4 py-4 text-center text-sm font-semibold text-brand-text">Pro Plus</th>
-                    <th className="px-4 py-4 text-center text-sm font-semibold text-brand-text">Enterprise</th>
-                    <th className="px-4 py-4 text-center text-sm font-semibold text-brand-text">Resort</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonFeatures.map((category) => (
-                    <>
-                      <tr key={category.category} className="border-b border-brand-border bg-gray-50">
-                        <td colSpan={6} className="px-4 py-3 text-sm font-semibold text-brand-text">
-                          {category.category}
-                        </td>
-                      </tr>
-                      {category.features.map((feature) => (
-                        <tr key={feature.name} className="border-b border-brand-border">
-                          <td className="px-4 py-3 text-sm text-brand-text">{feature.name}</td>
-                          <td className="px-4 py-3 text-center">
-                            {typeof feature.starter === 'boolean' ? (
-                              feature.starter ? (
-                                <Check className="mx-auto h-5 w-5 text-brand-accent" aria-label="Included" />
-                              ) : (
-                                <X className="mx-auto h-5 w-5 text-gray-300" aria-label="Not included" />
-                              )
-                            ) : (
-                              <span className="text-sm text-brand-muted">{feature.starter}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {typeof feature.pro === 'boolean' ? (
-                              feature.pro ? (
-                                <Check className="mx-auto h-5 w-5 text-brand-accent" aria-label="Included" />
-                              ) : (
-                                <X className="mx-auto h-5 w-5 text-gray-300" aria-label="Not included" />
-                              )
-                            ) : (
-                              <span className="text-sm text-brand-muted">{feature.pro}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {typeof feature.proPlus === 'boolean' ? (
-                              feature.proPlus ? (
-                                <Check className="mx-auto h-5 w-5 text-brand-accent" aria-label="Included" />
-                              ) : (
-                                <X className="mx-auto h-5 w-5 text-gray-300" aria-label="Not included" />
-                              )
-                            ) : (
-                              <span className="text-sm text-brand-muted">{feature.proPlus}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {typeof feature.enterprise === 'boolean' ? (
-                              feature.enterprise ? (
-                                <Check className="mx-auto h-5 w-5 text-brand-accent" aria-label="Included" />
-                              ) : (
-                                <X className="mx-auto h-5 w-5 text-gray-300" aria-label="Not included" />
-                              )
-                            ) : (
-                              <span className="text-sm text-brand-muted">{feature.enterprise}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {typeof feature.resort === 'boolean' ? (
-                              feature.resort ? (
-                                <Check className="mx-auto h-5 w-5 text-brand-accent" aria-label="Included" />
-                              ) : (
-                                <X className="mx-auto h-5 w-5 text-gray-300" aria-label="Not included" />
-                              )
-                            ) : (
-                              <span className="text-sm text-brand-muted">{feature.resort}</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Container>
-        </Section>
-
-        {/* Add-Ons */}
-        <Section background="gray">
-          <Container>
-            <SectionHeader
               subtitle="Flexible Add-Ons"
-              title="Enhance Your Plan"
-              description="Need more capacity? Add extra resources as you grow"
+              title="Need More Capacity?"
+              description="Add extra resources as your hotel grows"
               centered
             />
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {addOns.map((addOn, index) => (
+              {[
+                { name: 'Extra AI Messages', price: '$50', unit: 'per 500 messages' },
+                { name: 'Extra Voice Minutes', price: '$100', unit: 'per 100 minutes' },
+                { name: 'Additional Storage', price: '$20', unit: 'per 10 GB' },
+                { name: 'Premium Support', price: '$500', unit: 'per month' }
+              ].map((addOn, index) => (
                 <motion.div
                   key={addOn.name}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: '-50px' }}
                   transition={{ duration: 0.4, delay: index * 0.05 }}
-                  className="rounded-2xl border border-brand-border bg-white p-6 shadow-sm"
+                  className="rounded-2xl border border-brand-border bg-gradient-to-br from-gray-50 to-white p-6 shadow-sm hover:shadow-md transition-all"
                 >
-                  <h3 className="mb-2 text-lg font-semibold text-brand-text">{addOn.name}</h3>
+                  <h3 className="mb-3 text-lg font-semibold text-brand-text">{addOn.name}</h3>
                   <div className="mb-4">
                     <span className="text-3xl font-bold text-brand-primary">{addOn.price}</span>
-                    <span className="ml-1 text-sm text-brand-muted">{addOn.unit}</span>
+                    <span className="ml-2 text-sm text-brand-muted">{addOn.unit}</span>
                   </div>
-                  <p className="text-sm text-brand-muted">{addOn.description}</p>
                 </motion.div>
               ))}
             </div>
           </Container>
         </Section>
 
-        {/* CTA Section */}
+        {/* FAQ Section - Dark Theme */}
+        <Section background="gray" className="bg-slate-950">
+          <Container>
+            <SectionHeader
+              subtitle="Common Questions"
+              title="Pricing FAQs"
+              description="Everything you need to know about our plans"
+              centered
+            />
+            <div className="max-w-3xl mx-auto space-y-4">
+              {[
+                {
+                  q: 'Can I switch plans anytime?',
+                  a: 'Yes, you can upgrade or downgrade your plan at any time. Changes take effect at your next billing cycle.'
+                },
+                {
+                  q: 'Do you offer annual discounts?',
+                  a: 'Yes, we offer 20% off annual subscriptions. Contact our sales team for custom enterprise pricing.'
+                },
+                {
+                  q: 'Is there a setup fee?',
+                  a: 'No setup fees. You only pay for your subscription. Integration assistance is included in all paid plans.'
+                },
+                {
+                  q: 'What happens if I exceed my limits?',
+                  a: 'We\'ll notify you when approaching limits. You can purchase add-ons or upgrade your plan with no interruption.'
+                }
+              ].map((item, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                  className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-sm hover:border-brand-primary/30 transition-all"
+                >
+                  <h4 className="text-lg font-semibold text-white mb-3">{item.q}</h4>
+                  <p className="text-gray-300">{item.a}</p>
+                </motion.div>
+              ))}
+            </div>
+          </Container>
+        </Section>
+
+        {/* CTA Section - Dark Theme */}
         <Section background="white">
           <Container>
             <motion.div

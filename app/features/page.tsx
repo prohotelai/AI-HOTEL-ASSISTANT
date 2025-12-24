@@ -163,8 +163,8 @@ export default function FeaturesPage() {
     <>
       <Navbar />
       <main>
-        {/* Hero Section */}
-        <Section background="white" className="pt-20 pb-16 md:pt-24 md:pb-20">
+        {/* Hero Section - Dark Theme */}
+        <Section background="white" className="pt-20 pb-16 md:pt-24 md:pb-20 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-850">
           <Container>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -172,10 +172,10 @@ export default function FeaturesPage() {
               transition={{ duration: 0.6 }}
               className="text-center"
             >
-              <h1 className="mb-6 text-4xl font-semibold tracking-tight text-brand-text md:text-5xl lg:text-6xl">
+              <h1 className="mb-6 text-4xl font-semibold tracking-tight text-white md:text-5xl lg:text-6xl">
                 Everything You Need to Run a Modern Hotel
               </h1>
-              <p className="mx-auto mb-8 max-w-3xl text-lg text-brand-muted md:text-xl">
+              <p className="mx-auto mb-8 max-w-3xl text-lg text-gray-300 md:text-xl">
                 Discover how AI Hotel Assistant transforms every aspect of your hotel operations,
                 from guest interactions to backend management.
               </p>
@@ -189,7 +189,7 @@ export default function FeaturesPage() {
                 </Link>
                 <Link
                   href="/pricing"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-brand-primary bg-brand-card px-8 py-4 text-lg font-semibold text-brand-primary transition-all duration-300 hover:bg-brand-primary/5 active:scale-95"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-white/20 bg-white/5 px-8 py-4 text-lg font-semibold text-white transition-all duration-300 hover:bg-white/10 active:scale-95 backdrop-blur-sm"
                 >
                   View Pricing
                 </Link>
@@ -198,11 +198,12 @@ export default function FeaturesPage() {
           </Container>
         </Section>
 
-        {/* Feature Categories */}
+        {/* Feature Categories - Alternating Light/Dark */}
         {featureCategories.map((category, categoryIndex) => (
           <Section
             key={category.title}
             background={categoryIndex % 2 === 0 ? 'white' : 'gray'}
+            className={categoryIndex % 2 === 1 ? 'bg-slate-950' : ''}
           >
             <Container>
               <SectionHeader
@@ -225,8 +226,8 @@ export default function FeaturesPage() {
           </Section>
         ))}
 
-        {/* CTA Section */}
-        <Section background="white" className="border-t border-brand-border">
+        {/* CTA Section - Dark Theme */}
+        <Section background="white" className="border-t border-white/10 bg-gradient-to-br from-slate-900 to-slate-800">
           <Container>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
