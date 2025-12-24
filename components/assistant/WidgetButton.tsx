@@ -2,7 +2,6 @@
 
 import { X } from 'lucide-react'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
 import { useAssistant } from './AssistantProvider'
 import { cn } from '@/lib/utils'
 
@@ -10,30 +9,31 @@ export function WidgetButton() {
   const { isOpen, toggleWidget } = useAssistant()
 
   return (
-    <Button
+    <button
       onClick={toggleWidget}
-      size="lg"
       className={cn(
-        "fixed bottom-6 right-6 z-50 h-16 w-16 rounded-full shadow-xl",
-        "transition-all duration-300 hover:scale-110 hover:shadow-2xl",
-        "bg-gradient-to-br from-brand-primary to-brand-primary-dark",
-        "border-2 border-white/20",
-        isOpen && "scale-95"
+        "fixed bottom-6 right-6 z-50 h-16 w-16",
+        "transition-all duration-300 hover:scale-110",
+        "focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2",
+        "rounded-full",
+        isOpen ? "scale-95" : "drop-shadow-2xl hover:drop-shadow-[0_20px_35px_rgba(0,0,0,0.3)]"
       )}
       aria-label={isOpen ? "Close assistant" : "Open AI assistant"}
     >
       {isOpen ? (
-        <X className="h-7 w-7" />
+        <div className="w-full h-full rounded-full bg-gradient-to-br from-brand-primary to-brand-primary-dark flex items-center justify-center border-2 border-white/20">
+          <X className="h-7 w-7 text-white" />
+        </div>
       ) : (
         <Image
           src="/images/logo.png"
           alt="AI Assistant"
-          width={36}
-          height={36}
-          className="transition-transform group-hover:scale-110"
+          width={64}
+          height={64}
+          className="rounded-full transition-transform"
           priority
         />
       )}
-    </Button>
+    </button>
   )
 }

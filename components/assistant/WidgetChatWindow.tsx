@@ -93,12 +93,12 @@ export function WidgetChatWindow() {
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="space-y-4">
-            <div className="text-center text-muted-foreground text-sm py-8">
+            <div className="text-center text-gray-600 text-sm py-8">
               <p className="mb-4">👋 Hi! I&apos;m your AI assistant.</p>
               <p>Ask me anything about the platform!</p>
             </div>
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Quick actions:</p>
+              <p className="text-xs text-gray-500 font-medium">Quick actions:</p>
               {quickActions.map((action, idx) => (
                 <Button
                   key={idx}
@@ -124,14 +124,14 @@ export function WidgetChatWindow() {
               >
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-lg px-4 py-2",
+                    "max-w-[85%] rounded-lg px-4 py-2.5",
                     message.role === 'user'
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      ? "bg-brand-primary text-white"
+                      : "bg-gray-100 text-gray-900 border border-gray-200"
                   )}
                 >
                   {message.role === 'assistant' ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="prose prose-sm max-w-none text-gray-900">
                       <ReactMarkdown>{message.content}</ReactMarkdown>
                     </div>
                   ) : (
@@ -142,8 +142,8 @@ export function WidgetChatWindow() {
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-muted rounded-lg px-4 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-2.5">
+                  <Loader2 className="h-4 w-4 animate-spin text-brand-primary" />
                 </div>
               </div>
             )}
