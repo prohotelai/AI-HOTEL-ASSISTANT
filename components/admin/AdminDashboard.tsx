@@ -16,7 +16,7 @@ import { AdminDashboardData } from '@/lib/services/adminService'
 import { OnboardingProgressWidget } from '@/components/onboarding/OnboardingProgressWidget'
 import type { OnboardingProgressData } from '@/lib/services/onboarding/onboardingStepService'
 import { format } from 'date-fns'
-import { AlertCircle, Download, Loader, QrCode, User, Users, Key } from 'lucide-react'
+import { AlertCircle, Download, Loader, QrCode, User, Users, Key, Settings, Building2, Zap, GitBranch, BarChart3, Phone, Webhook, Clock, Package, BookOpen, ArrowRight } from 'lucide-react'
 
 const PIE_COLORS = ['#2563EB', '#14B8A6', '#F97316', '#F43F5E', '#6366F1']
 type TicketStatusKey = AdminDashboardData['tickets'][number]['status'] extends never
@@ -97,37 +97,10 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
   )
 
   const [onboardingProgress, setOnboardingProgress] = useState<OnboardingProgressData | null>(null)
-  const [qrLoading, setQrLoading] = useState(false)
-  const [staffDialogOpen, setStaffDialogOpen] = useState(false)
-  const [staffIdLoading, setStaffIdLoading] = useState(false)
 
-  const handleGenerateQR = async () => {
-    try {
-      setQrLoading(true)
-      const response = await fetch(`/api/admin/qr`, { method: 'POST' })
-      if (response.ok) {
-        const data = await response.json()
-        // Open QR in new window or show modal
-        window.open(`/qr/${data.token}`, 'QR_CODE', 'width=600,height=600')
-      }
-    } catch (error) {
-      console.error('Failed to generate QR:', error)
-    } finally {
-      setQrLoading(false)
-    }
-  }
-
-  const handleGenerateStaffId = async () => {
-    try {
-      setStaffIdLoading(true)
-      const response = await fetch(`/api/admin/staff/generate-id`, { method: 'POST' })
-      if (response.ok) {
-        setStaffDialogOpen(true)
-      }
-    } catch (error) {
-      console.error('Failed to generate staff ID:', error)
-    } finally {
-      setStaffIdLoading(false)
+  const navigateTo = (path: string) => {
+    if (typeof window !== 'undefined') {
+      window.location.href = path
     }
   }
 
@@ -163,77 +136,170 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
           />
         </section>
 
-        {/* Control Panel - Hotel Management */}
-        <section className="bg-white rounded-xl border p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Hotel Controls</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <ControlCard
-              icon={<QrCode className="w-6 h-6" />}
-              label="Generate QR Code"
-              description="Create guest access QR"
-              onClick={handleGenerateQR}
-              loading={qrLoading}
+        {/* HOTEL SETUP & CONFIGURATION SECTION */}
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Hotel Configuration</h2>
+            <p className="text-gray-600">Manage your hotel setup and core settings</p>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-3">
+            <DashboardCard
+              icon={<Building2 className="w-6 h-6" />}
+              title="Hotel Details"
+              description="Configure basic hotel information and contact details"
+              onClick={() => navigateTo('/dashboard/admin/settings')}
               color="blue"
             />
-            <ControlCard
-              icon={<User className="w-6 h-6" />}
-              label="Generate Staff ID"
-              description="Create staff credentials"
-              onClick={handleGenerateStaffId}
-              loading={staffIdLoading}
-              color="green"
-            />
-            <ControlCard
-              icon={<Users className="w-6 h-6" />}
-              label="Manage Staff"
-              description="Add/edit staff members"
-              onClick={() => window.location.href = '/dashboard/admin/staff'}
+            <DashboardCard
+              icon={<Package className="w-6 h-6" />}
+              title="Room Configuration"
+              description="Manage room types and inventory"
+              onClick={() => navigateTo('/dashboard/admin/rooms')}
               color="purple"
             />
-            <ControlCard
-              icon={<Key className="w-6 h-6" />}
-              label="Settings"
-              description="Hotel configuration"
-              onClick={() => window.location.href = '/dashboard/admin/settings'}
+            <DashboardCard
+              icon={<Zap className="w-6 h-6" />}
+              title="Automation Rules"
+              description="Set up automated operations and workflows"
+              onClick={() => navigateTo('/dashboard/admin/automation')}
+              color="amber"
+            />
+          </div>
+        </section>
+
+        {/* PMS INTEGRATION SECTION */}
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">PMS Integration</h2>
+            <p className="text-gray-600">Connect and sync with your Property Management System</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <DashboardCard
+              icon={<GitBranch className="w-6 h-6" />}
+              title="PMS Configuration"
+              description="Configure PMS connection settings and credentials"
+              onClick={() => navigateTo('/dashboard/admin/pms/integration')}
+              color="emerald"
+            />
+            <DashboardCard
+              icon={<Webhook className="w-6 h-6" />}
+              title="PMS Sync Status"
+              description="Monitor real-time PMS synchronization and logs"
+              onClick={() => navigateTo('/dashboard/admin/pms')}
+              color="blue"
+            />
+            <DashboardCard
+              icon={<Clock className="w-6 h-6" />}
+              title="Sync Operations"
+              description="Trigger manual sync and view operation history"
+              onClick={() => navigateTo('/dashboard/admin/pms/connect')}
+              color="cyan"
+            />
+          </div>
+        </section>
+
+        {/* GUEST & CRM SECTION */}
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Guest & CRM Management</h2>
+            <p className="text-gray-600">Manage guests, reservations and customer relationships</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <DashboardCard
+              icon={<User className="w-6 h-6" />}
+              title="Guest Profiles"
+              description="View and manage guest information and history"
+              onClick={() => navigateTo('/dashboard/admin/guests')}
+              color="pink"
+            />
+            <DashboardCard
+              icon={<BarChart3 className="w-6 h-6" />}
+              title="Bookings & Reservations"
+              description="Manage all bookings and reservation data"
+              onClick={() => navigateTo('/dashboard/admin/bookings')}
+              color="indigo"
+            />
+            <DashboardCard
+              icon={<Phone className="w-6 h-6" />}
+              title="Guest Communications"
+              description="Track guest interactions and communications"
+              onClick={() => navigateTo('/dashboard/admin/communications')}
               color="orange"
             />
           </div>
         </section>
 
-        {/* Quick Actions */}
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="bg-white rounded-xl border p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Download className="w-5 h-5" />
-              Quick Downloads
-            </h2>
-            <div className="space-y-2">
-              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
-                📋 Export Bookings Report
-              </button>
-              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
-                📊 Export Revenue Report
-              </button>
-              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
-                👥 Export Staff Directory
-              </button>
-              <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-50 text-sm text-gray-700">
-                🎫 Export Tickets
-              </button>
-            </div>
+        {/* OPERATIONS & SUPPORT SECTION */}
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Operations & Support</h2>
+            <p className="text-gray-600">Manage staff, QR codes, tickets and system operations</p>
           </div>
 
-          <div className="bg-white rounded-xl border p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              System Status
-            </h2>
-            <div className="space-y-3">
-              <StatusItem label="Database" status="healthy" />
-              <StatusItem label="QR Service" status="healthy" />
-              <StatusItem label="AI Assistant" status="healthy" />
-              <StatusItem label="Email Service" status="healthy" />
-            </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <DashboardCard
+              icon={<QrCode className="w-6 h-6" />}
+              title="QR Codes"
+              description="Generate and manage QR codes for guest access"
+              onClick={() => navigateTo('/dashboard/admin/qr')}
+              color="blue"
+            />
+            <DashboardCard
+              icon={<Users className="w-6 h-6" />}
+              title="Staff Management"
+              description="Manage staff members and permissions"
+              onClick={() => navigateTo('/dashboard/admin/staff')}
+              color="green"
+            />
+            <DashboardCard
+              icon={<BookOpen className="w-6 h-6" />}
+              title="Support Tickets"
+              description="View and manage support tickets"
+              onClick={() => navigateTo('/dashboard/admin/tickets')}
+              color="red"
+            />
+            <DashboardCard
+              icon={<Key className="w-6 h-6" />}
+              title="Access Control"
+              description="Manage roles, permissions and access"
+              onClick={() => navigateTo('/dashboard/admin/rbac/roles')}
+              color="purple"
+            />
+          </div>
+        </section>
+
+        {/* ANALYTICS & INSIGHTS SECTION */}
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Analytics & Insights</h2>
+            <p className="text-gray-600">View detailed reports and business intelligence</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <DashboardCard
+              icon={<BarChart3 className="w-6 h-6" />}
+              title="Revenue Analytics"
+              description="Track revenue, occupancy and performance metrics"
+              onClick={() => navigateTo('/dashboard/admin/analytics')}
+              color="emerald"
+            />
+            <DashboardCard
+              icon={<Download className="w-5 h-5" />}
+              title="Reports & Exports"
+              description="Generate custom reports and export data"
+              onClick={() => navigateTo('/dashboard/admin/reports')}
+              color="slate"
+            />
+            <DashboardCard
+              icon={<AlertCircle className="w-6 h-6" />}
+              title="System Health"
+              description="Monitor system performance and alerts"
+              onClick={() => navigateTo('/dashboard/admin/health')}
+              color="yellow"
+            />
           </div>
         </section>
 
@@ -539,6 +605,62 @@ function StatusItem({ label, status }: StatusItemProps) {
         {statusDots[status]} {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     </div>
+  )
+}
+
+type DashboardCardProps = {
+  icon: React.ReactNode
+  title: string
+  description: string
+  onClick: () => void
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'emerald' | 'indigo' | 'pink' | 'red' | 'cyan' | 'amber' | 'yellow' | 'slate'
+}
+
+const dashboardCardColors: Record<string, string> = {
+  blue: 'hover:shadow-blue-100 border-blue-200 hover:border-blue-300 bg-blue-50/50',
+  green: 'hover:shadow-green-100 border-green-200 hover:border-green-300 bg-green-50/50',
+  emerald: 'hover:shadow-emerald-100 border-emerald-200 hover:border-emerald-300 bg-emerald-50/50',
+  purple: 'hover:shadow-purple-100 border-purple-200 hover:border-purple-300 bg-purple-50/50',
+  indigo: 'hover:shadow-indigo-100 border-indigo-200 hover:border-indigo-300 bg-indigo-50/50',
+  pink: 'hover:shadow-pink-100 border-pink-200 hover:border-pink-300 bg-pink-50/50',
+  red: 'hover:shadow-red-100 border-red-200 hover:border-red-300 bg-red-50/50',
+  cyan: 'hover:shadow-cyan-100 border-cyan-200 hover:border-cyan-300 bg-cyan-50/50',
+  orange: 'hover:shadow-orange-100 border-orange-200 hover:border-orange-300 bg-orange-50/50',
+  amber: 'hover:shadow-amber-100 border-amber-200 hover:border-amber-300 bg-amber-50/50',
+  yellow: 'hover:shadow-yellow-100 border-yellow-200 hover:border-yellow-300 bg-yellow-50/50',
+  slate: 'hover:shadow-slate-100 border-slate-200 hover:border-slate-300 bg-slate-50/50',
+}
+
+const dashboardIconColors: Record<string, string> = {
+  blue: 'text-blue-600',
+  green: 'text-green-600',
+  emerald: 'text-emerald-600',
+  purple: 'text-purple-600',
+  indigo: 'text-indigo-600',
+  pink: 'text-pink-600',
+  red: 'text-red-600',
+  cyan: 'text-cyan-600',
+  orange: 'text-orange-600',
+  amber: 'text-amber-600',
+  yellow: 'text-yellow-600',
+  slate: 'text-slate-600',
+}
+
+function DashboardCard({ icon, title, description, onClick, color = 'blue' }: DashboardCardProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`bg-white rounded-xl border p-6 text-left transition-all hover:shadow-lg ${dashboardCardColors[color]}`}
+    >
+      <div className={`${dashboardIconColors[color]} mb-3`}>
+        {icon}
+      </div>
+      <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
+      <p className="text-sm text-gray-600 mb-4">{description}</p>
+      <div className="flex items-center text-sm font-medium text-gray-600 group-hover:text-gray-900">
+        Go to <ArrowRight className="w-4 h-4 ml-1" />
+      </div>
+    </button>
   )
 }
 
