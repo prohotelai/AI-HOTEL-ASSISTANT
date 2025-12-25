@@ -23,7 +23,7 @@ interface AdminNavItem {
 }
 
 const adminNavItems: AdminNavItem[] = [
-  { label: 'Dashboard', href: '/dashboard/admin', icon: <BarChart3 className="w-4 h-4" /> },
+  { label: 'Dashboard', href: '/admin/dashboard', icon: <BarChart3 className="w-4 h-4" /> },
   { label: 'Hotel QR', href: '/dashboard/admin/hotel-qr', icon: <QrCode className="w-4 h-4" /> },
   { label: 'PMS Setup', href: '/dashboard/admin/pms', icon: <Building2 className="w-4 h-4" /> },
   { label: 'RBAC', href: '/dashboard/admin/rbac', icon: <ShieldCheck className="w-4 h-4" /> },
@@ -37,7 +37,7 @@ export default function AdminHeader() {
   const { userName, hotelName, isLoading } = useAdminContext()
 
   // GUARD: Ensure this component is only used on /admin routes (client-side only)
-  if (typeof window !== 'undefined' && !pathname?.startsWith('/dashboard/admin')) {
+  if (typeof window !== 'undefined' && !pathname?.startsWith('/admin') && !pathname?.startsWith('/dashboard/admin')) {
     console.error('❌ CRITICAL: AdminHeader used outside /admin routes:', pathname)
     throw new Error('AdminHeader can only be used in /admin routes')
   }
@@ -47,8 +47,8 @@ export default function AdminHeader() {
   }
 
   const isActive = (href: string) => {
-    if (href === '/dashboard/admin') {
-      return pathname === href
+    if (href === '/admin/dashboard') {
+      return pathname === href || pathname === '/dashboard/admin'
     }
     return pathname?.startsWith(href) || false
   }

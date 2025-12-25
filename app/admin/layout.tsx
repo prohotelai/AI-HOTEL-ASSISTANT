@@ -6,7 +6,9 @@ import { AdminProvider } from '@/lib/contexts/AdminContext'
  * Admin Layout - SaaS Platform Level Layout
  * 
  * STRICT ISOLATION:
- * - This layout applies to ALL /admin/** routes (except auth route group)
+ * - This layout applies to /admin/** routes ONLY
+ * - Auth routes (/admin/login, /admin/register) are in app/(auth)/admin/*
+ *   and do NOT use this layout (route group isolation)
  * - Uses AdminHeader (NOT PMS DashboardNavigation)
  * - Uses AdminProvider (NOT PMSProvider)
  * - NEVER imports PMS components
@@ -14,14 +16,15 @@ import { AdminProvider } from '@/lib/contexts/AdminContext'
  * 
  * Route Scope:
  * - /admin/dashboard (main dashboard)
- * - /admin/** (all admin routes)
+ * - /admin/** (all admin routes except auth)
  * 
- * Excluded:
- * - /admin/(auth)/** (route group with own layout - login/register)
+ * Excluded (via route group):
+ * - /admin/login (in app/(auth)/admin/login/)
+ * - /admin/register (in app/(auth)/admin/register/)
  * 
  * CRITICAL:
  * This is the ONLY place AdminProvider should exist.
- * Auth pages in (auth) route group bypass this layout.
+ * Auth pages use app/(auth)/layout.tsx instead.
  */
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
