@@ -138,6 +138,37 @@ export default function SetupWizardPage() {
     }
   }
 
+  async function handleSkip() {
+    if (!hotelId || currentStep === 4) return // Can't skip last step
+
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/wizard/skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to skip step')
+      }
+
+      const newState: WizardState = await res.json()
+      setWizardState(newState)
+
+      // Move to next step
+      if (newState.step) {
+        setCurrentStep(newState.step)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to skip step')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   function handleBack() {
     if (currentStep > 1) {
       setCurrentStep((currentStep - 1) as 1 | 2 | 3 | 4)
@@ -235,7 +266,7 @@ export default function SetupWizardPage() {
 
             {/* Step 2: Web Scan */}
             {currentStep === 2 && (
-              <Step2Content onNext={handleNextStep} isLoading={submitting} />
+              <Step2Content onNext={handleNextStep} onSkip={handleSkip} isLoading={submitting} />
             )}
 
             {/* Step 3: Knowledge Review */}
@@ -403,20 +434,44 @@ function Step1Content({
 
 function Step2Content({
   onNext,
+  onSkip,
   isLoading,
 }: {
   onNext: (data: any) => void
+  onSkip: () => void
   isLoading: boolean
 }) {
+  const [scanning, setScanning] = useState(false)
+
+  const handleScan = () => {
+    setScanning(true)
+    // Simulate scan
+    setTimeout(() => {
+      setScanning(false)
+      onNext({ scannedData: 'website scan complete' })
+    }, 2000)
+  }
+
   return (
     <div className="space-y-4">
-      <div className="text-center py-8">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-        <p className="text-gray-600">Scanning your website...</p>
-        <p className="text-sm text-gray-500 mt-2">
-          This usually takes 30-60 seconds
-        </p>
-      </div>
+      {scanning ? (
+        <div className="text-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Scanning your website...</p>
+          <p className="text-sm text-gray-500 mt-2">
+            This usually takes 30-60 seconds
+          </p>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-gray-600 mb-4">
+            We can automatically scan your website to extract information about your hotel.
+          </p>
+          <p className="text-sm text-gray-500">
+            This will help pre-fill your knowledge base with amenities, services, and FAQs.
+          </p>
+        </div>
+      )}
 
       <Alert>
         <AlertDescription>
@@ -425,13 +480,23 @@ function Step2Content({
         </AlertDescription>
       </Alert>
 
-      <Button
-        onClick={() => onNext({ scannedData: 'website scan complete' })}
-        disabled={isLoading}
-        className="w-full"
-      >
-        {isLoading ? 'Scanning...' : 'Done - Continue'}
-      </Button>
+      <div className="flex gap-3">
+        <Button
+          onClick={handleScan}
+          disabled={isLoading || scanning}
+          className="flex-1"
+        >
+          {scanning ? 'Scanning...' : 'Start Scan'}
+        </Button>
+        <Button
+          onClick={onSkip}
+          disabled={isLoading || scanning}
+          variant="outline"
+          className="flex-1"
+        >
+          Skip for Now
+        </Button>
+      </div>
     </div>
   )
 }

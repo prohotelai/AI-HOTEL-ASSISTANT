@@ -14,32 +14,41 @@ export interface WizardGuardResult {
 }
 
 /**
- * Check wizard status for a hotel
+ * Check wizard status for a hotel using OnboardingProgress table
  * Returns whether wizard is completed and what the current step is
  */
 export async function getWizardGuardStatus(
   hotelId: string
 ): Promise<WizardGuardResult> {
-  // Note: wizardStatus and wizardStep don't exist in database
-  // For now, always return wizard as not completed since we can't track state
-  const hotel = await prisma.hotel.findUnique({
-    where: { id: hotelId },
+  const progress = await prisma.onboardingProgress.findUnique({
+    where: { hotelId },
     select: {
-      id: true,
+      status: true,
+      currentStep: true,
     },
   })
 
-  if (!hotel) {
+  // If no progress record, wizard not started
+  if (!progress) {
     return {
       isCompleted: false,
-      currentStep: 1,
+      currentStep: null,
       wizardUrl: '/admin/setup-wizard',
     }
   }
 
+  // Parse current step from string format ("step1" -> 1)
+  let step: 1 | 2 | 3 | 4 | null = null
+  if (progress.currentStep) {
+    const stepNum = parseInt(progress.currentStep.replace('step', ''), 10)
+    if (stepNum >= 1 && stepNum <= 4) {
+      step = stepNum as 1 | 2 | 3 | 4
+    }
+  }
+
   return {
-    isCompleted: false,
-    currentStep: 1, // Since wizard state doesn't exist in database, always start at step 1
+    isCompleted: progress.status === 'COMPLETED',
+    currentStep: step,
     wizardUrl: '/admin/setup-wizard',
   }
 }
