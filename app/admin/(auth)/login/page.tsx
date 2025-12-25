@@ -65,8 +65,8 @@ function OwnerLoginContent() {
         }
         
         // Default: redirect to admin dashboard
-        console.log('✅ LOGIN: All checks passed, redirecting to /dashboard/admin')
-        router.push('/dashboard/admin')
+        console.log('✅ LOGIN: All checks passed, redirecting to /admin/dashboard')
+        router.push('/admin/dashboard')
       }
     }
     

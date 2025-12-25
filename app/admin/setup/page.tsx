@@ -91,7 +91,7 @@ export default function AdminSetupWizardPage() {
         // If wizard completed, redirect to dashboard
         if (state?.status === 'COMPLETED') {
           console.log('✅ Wizard already completed, redirecting to dashboard')
-          router.push('/dashboard/admin')
+          router.push('/admin/dashboard')
           return
         }
 
@@ -165,7 +165,7 @@ export default function AdminSetupWizardPage() {
       // If step 4 completed, redirect to dashboard
       if (stepNumber === 4 || result.status === 'COMPLETED') {
         console.log('🎉 Wizard completed! Redirecting to dashboard...')
-        router.push('/dashboard/admin')
+        router.push('/admin/dashboard')
         return
       }
 
@@ -317,7 +317,7 @@ export default function AdminSetupWizardPage() {
         {/* Skip for Now Button */}
         <div className="mt-12 text-center">
           <button
-            onClick={() => router.push('/dashboard/admin')}
+            onClick={() => router.push('/admin/dashboard')}
             className="text-slate-400 hover:text-slate-300 underline"
           >
             Skip setup for now (you can complete it later)
