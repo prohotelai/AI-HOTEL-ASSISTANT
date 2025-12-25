@@ -401,9 +401,9 @@ function Step2WebsiteScan({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div>
-      <h4 className="text-white font-semibold mb-4">Website Scan (Coming Soon)</h4>
+      <h4 className="text-white font-semibold mb-4">Website Scan</h4>
       <p className="text-slate-400 mb-6">
-        We&apos;ll automatically extract information from your website to train the AI.
+        We&apos;ll automatically extract information from your website to train the AI. For now, you can skip this step and add information manually in the next step.
       </p>
       <button
         onClick={handleClick}
@@ -417,7 +417,7 @@ function Step2WebsiteScan({ onComplete }: { onComplete: () => void }) {
           </>
         ) : (
           <>
-            Skip This Step for Now
+            Continue to Next Step
             <ArrowRight className="w-4 h-4" />
           </>
         )}
@@ -437,9 +437,9 @@ function Step3ReviewKnowledge({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div>
-      <h4 className="text-white font-semibold mb-4">Review Knowledge (Coming Soon)</h4>
+      <h4 className="text-white font-semibold mb-4">Review Knowledge</h4>
       <p className="text-slate-400 mb-6">
-        Review and enrich the AI&apos;s knowledge about your hotel.
+        Review and enrich the AI&apos;s knowledge about your hotel. You can add more information later from the dashboard.
       </p>
       <button
         onClick={handleClick}
@@ -453,7 +453,7 @@ function Step3ReviewKnowledge({ onComplete }: { onComplete: () => void }) {
           </>
         ) : (
           <>
-            Skip This Step for Now
+            Continue to Next Step
             <ArrowRight className="w-4 h-4" />
           </>
         )}
@@ -473,9 +473,9 @@ function Step4TestAI({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div>
-      <h4 className="text-white font-semibold mb-4">Test Your AI Assistant (Coming Soon)</h4>
+      <h4 className="text-white font-semibold mb-4">Test Your AI Assistant</h4>
       <p className="text-slate-400 mb-6">
-        Try asking questions to see how the AI will respond to your guests.
+        Your AI assistant is ready! You can test it now or complete the setup and try it from the dashboard.
       </p>
       <button
         onClick={handleClick}
@@ -489,7 +489,7 @@ function Step4TestAI({ onComplete }: { onComplete: () => void }) {
           </>
         ) : (
           <>
-            Complete Setup
+            Complete Setup & Go to Dashboard
             <CheckCircle2 className="w-4 h-4" />
           </>
         )}
