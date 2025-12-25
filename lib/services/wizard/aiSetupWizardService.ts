@@ -25,6 +25,8 @@
  * - User.wizardCompletedAt: Mirror of Hotel
  */
 
+'use server'
+
 import { prisma } from '@/lib/prisma'
 
 export interface WizardState {
