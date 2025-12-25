@@ -130,11 +130,14 @@ export async function completeStep1(
   hotelId: string,
   data: WizardStep1Data
 ): Promise<WizardState> {
-  // Update hotel details
+  // Update hotel details with ALL form data
   await prisma.hotel.update({
     where: { id: hotelId },
     data: {
       name: data.hotelName,
+      city: data.city,
+      country: data.country,
+      hotelType: data.hotelType,
       website: data.websiteUrl || null,
     },
   })

@@ -1,53 +1,33 @@
 'use client'
 
-// Force dynamic rendering (no SSR/prerendering)
-export const dynamic = 'force-dynamic'
-
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
-import { Loader2, CheckCircle2, Circle, ArrowRight } from 'lucide-react'
-
-interface WizardState {
-  status: 'IN_PROGRESS' | 'COMPLETED' | null
-  step: 1 | 2 | 3 | 4 | null
-  completedAt: Date | null
-}
-
 /**
- * Admin Setup Wizard Page
+ * DEPRECATED: Old Setup Wizard
  * 
- * PURPOSE:
- * - First-time setup after signup
- * - Resumable if interrupted
- * - Accessible later from admin dashboard
+ * This route has been replaced by /admin/setup-wizard
+ * Redirecting all traffic to the new wizard system.
  * 
- * FLOW:
- * - Signup → /admin/setup (automatic)
- * - Complete wizard → /admin (dashboard)
- * - Later: Admin dashboard → "Setup Wizard" link → /admin/setup
- * 
- * WIZARD STEPS:
- * 1. Hotel Information (name, location, type)
- * 2. Website Scan (automatic knowledge extraction)
- * 3. Knowledge Review & Enrichment
- * 4. AI Testing & Validation
+ * DO NOT USE THIS FILE - it exists only for backward compatibility
  */
 
-interface Step {
-  number: number
-  title: string
-  description: string
-  completed: boolean
-  current: boolean
-}
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
-export default function AdminSetupWizardPage() {
+export default function OldSetupRedirect() {
   const router = useRouter()
-  const { data: session, status } = useSession()
   
-  const [hotelId, setHotelId] = useState<string | null>(null)
-  const [hotelName, setHotelName] = useState<string>('')
+  useEffect(() => {
+    // Redirect to new wizard immediately
+    router.replace('/admin/setup-wizard')
+  }, [router])
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Redirecting to setup wizard...</p>
+      </div>
+    </div>
+  )
   const [wizardState, setWizardState] = useState<WizardState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

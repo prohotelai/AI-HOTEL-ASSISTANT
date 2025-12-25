@@ -23,9 +23,9 @@ model Hotel {
   email   String?
   phone   String?
   address String?
-  // city    String?
-  // country String?
-  // hotelType String? // "Hotel" | "Boutique" | "Aparthotel"
+  city    String?
+  country String?
+  hotelType String? // "Hotel" | "Boutique" | "Aparthotel"
 
   // Widget configuration
   widgetColor String? @default("#3B82F6")

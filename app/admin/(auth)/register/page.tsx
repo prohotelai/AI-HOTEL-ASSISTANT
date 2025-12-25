@@ -106,9 +106,9 @@ export default function RegisterPage() {
         return
       }
 
-      console.log('✅ Auto-login successful, redirecting to /admin/setup')
+      console.log('✅ Auto-login successful, redirecting to /admin/setup-wizard')
       // Redirect to setup wizard after auto-login
-      router.push('/admin/setup?firstLogin=true')
+      router.push('/admin/setup-wizard')
     } catch (error: any) {
       setError(error.message || 'An error occurred. Please try again.')
     } finally {
