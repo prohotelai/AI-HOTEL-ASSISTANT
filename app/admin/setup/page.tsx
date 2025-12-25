@@ -28,7 +28,7 @@ export default function OldSetupRedirect() {
       </div>
     </div>
   )
-  const [wizardState, setWizardState] = useState<WizardState | null>(null)
+}
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
