@@ -7,15 +7,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Loader2, CheckCircle2, Circle, ArrowRight } from 'lucide-react'
-import { 
-  getWizardState, 
-  skipToNextStep, 
-  completeStep1,
-  completeStep2,
-  completeStep3,
-  completeStep4,
-  type WizardState 
-} from '@/lib/services/wizard/aiSetupWizardService'
+
+interface WizardState {
+  status: 'IN_PROGRESS' | 'COMPLETED' | null
+  step: 1 | 2 | 3 | 4 | null
+  completedAt: Date | null
+}
 
 /**
  * Admin Setup Wizard Page
@@ -80,7 +77,13 @@ export default function AdminSetupWizardPage() {
 
       try {
         setLoading(true)
-        const state = await getWizardState(hotelId)
+        const response = await fetch(`/api/wizard/state?hotelId=${hotelId}`)
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch wizard state')
+        }
+        
+        const state = await response.json()
         
         console.log('📊 WIZARD STATE:', state)
         
@@ -108,37 +111,43 @@ export default function AdminSetupWizardPage() {
     if (!hotelId) return
 
     try {
-      // Call step-specific completion functions
-      if (stepNumber === 1) {
-        await completeStep1(hotelId, { 
-          hotelName: hotelName || '', 
-          country: '', 
-          city: '', 
-          hotelType: 'Hotel' 
+      // Call API to complete step
+      const response = await fetch('/api/wizard/complete-step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          step: stepNumber,
+          data: stepNumber === 1 ? {
+            hotelName: hotelName || '',
+            country: '',
+            city: '',
+            hotelType: 'Hotel'
+          } : stepNumber === 3 ? {
+            knowledge: '',
+            confirmedItems: []
+          } : stepNumber === 4 ? {
+            testQuestions: [],
+            feedbackGiven: 0
+          } : undefined
         })
-      } else if (stepNumber === 2) {
-        await completeStep2(hotelId) // No data parameter
-      } else if (stepNumber === 3) {
-        await completeStep3(hotelId, { 
-          knowledge: '', 
-          confirmedItems: [] 
-        })
-      } else if (stepNumber === 4) {
-        // Step 4 marks wizard as complete
-        await completeStep4(hotelId, { 
-          testQuestions: [], 
-          feedbackGiven: 0 
-        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to complete step')
+      }
+
+      const result = await response.json()
+      
+      // If step 4 completed, redirect to dashboard
+      if (stepNumber === 4 || result.status === 'COMPLETED') {
         console.log('🎉 Wizard completed!')
         router.push('/dashboard/admin')
         return
       }
 
-      // Move to next step
-      await skipToNextStep(hotelId)
-      
-      // Reload state
-      const updatedState = await getWizardState(hotelId)
+      // Reload wizard state
+      const stateResponse = await fetch(`/api/wizard/state?hotelId=${hotelId}`)
+      const updatedState = await stateResponse.json()
       setWizardState(updatedState)
     } catch (err) {
       console.error('Failed to complete step:', err)
