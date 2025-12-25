@@ -51,6 +51,7 @@ export default function AdminSetupWizardPage() {
   const [wizardState, setWizardState] = useState<WizardState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // Extract hotel info from session
   useEffect(() => {
@@ -108,9 +109,27 @@ export default function AdminSetupWizardPage() {
 
   // Handle step completion
   const handleStepComplete = async (stepNumber: number) => {
-    if (!hotelId) return
+    if (!hotelId) {
+      console.error('❌ No hotelId available')
+      setError('Missing hotel information. Please try refreshing the page.')
+      return
+    }
+
+    if (submitting) {
+      console.log('⏳ Already submitting, ignoring click')
+      return
+    }
 
     try {
+      setSubmitting(true)
+      setError(null)
+      
+      console.log(`🚀 Completing step ${stepNumber}...`, {
+        hotelId,
+        hotelName,
+        step: stepNumber
+      })
+
       // Call API to complete step
       const response = await fetch('/api/wizard/complete-step', {
         method: 'POST',
@@ -118,7 +137,7 @@ export default function AdminSetupWizardPage() {
         body: JSON.stringify({
           step: stepNumber,
           data: stepNumber === 1 ? {
-            hotelName: hotelName || '',
+            hotelName: hotelName || 'Unknown Hotel',
             country: '',
             city: '',
             hotelType: 'Hotel'
@@ -132,26 +151,35 @@ export default function AdminSetupWizardPage() {
         })
       })
 
+      console.log('📥 API Response:', response.status, response.statusText)
+
       if (!response.ok) {
-        throw new Error('Failed to complete step')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ API Error:', errorData)
+        throw new Error(errorData.error || `Failed to complete step (${response.status})`)
       }
 
       const result = await response.json()
+      console.log('✅ Step completed:', result)
       
       // If step 4 completed, redirect to dashboard
       if (stepNumber === 4 || result.status === 'COMPLETED') {
-        console.log('🎉 Wizard completed!')
+        console.log('🎉 Wizard completed! Redirecting to dashboard...')
         router.push('/dashboard/admin')
         return
       }
 
       // Reload wizard state
+      console.log('🔄 Reloading wizard state...')
       const stateResponse = await fetch(`/api/wizard/state?hotelId=${hotelId}`)
       const updatedState = await stateResponse.json()
+      console.log('📊 Updated state:', updatedState)
       setWizardState(updatedState)
     } catch (err) {
-      console.error('Failed to complete step:', err)
-      setError('Failed to save progress. Please try again.')
+      console.error('❌ Failed to complete step:', err)
+      setError(err instanceof Error ? err.message : 'Failed to save progress. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -327,24 +355,50 @@ function WizardStepContent({
 }
 
 function Step1HotelInfo({ hotelName, onComplete }: { hotelName: string; onComplete: () => void }) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleClick = async () => {
+    setIsSubmitting(true)
+    await onComplete()
+    setIsSubmitting(false)
+  }
+
   return (
     <div>
       <h4 className="text-white font-semibold mb-4">Your Hotel Information</h4>
       <p className="text-slate-400 mb-6">
-        We already have your hotel name: <strong className="text-white">{hotelName}</strong>
+        We already have your hotel name: <strong className="text-white">{hotelName || '(Not set)'}</strong>
       </p>
       <button
-        onClick={onComplete}
-        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+        onClick={handleClick}
+        disabled={isSubmitting}
+        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Continue to Next Step
-        <ArrowRight className="w-4 h-4" />
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          <>
+            Continue to Next Step
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
       </button>
     </div>
   )
 }
 
 function Step2WebsiteScan({ onComplete }: { onComplete: () => void }) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleClick = async () => {
+    setIsSubmitting(true)
+    await onComplete()
+    setIsSubmitting(false)
+  }
+
   return (
     <div>
       <h4 className="text-white font-semibold mb-4">Website Scan (Coming Soon)</h4>
@@ -352,17 +406,35 @@ function Step2WebsiteScan({ onComplete }: { onComplete: () => void }) {
         We&apos;ll automatically extract information from your website to train the AI.
       </p>
       <button
-        onClick={onComplete}
-        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+        onClick={handleClick}
+        disabled={isSubmitting}
+        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Skip This Step for Now
-        <ArrowRight className="w-4 h-4" />
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          <>
+            Skip This Step for Now
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
       </button>
     </div>
   )
 }
 
 function Step3ReviewKnowledge({ onComplete }: { onComplete: () => void }) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleClick = async () => {
+    setIsSubmitting(true)
+    await onComplete()
+    setIsSubmitting(false)
+  }
+
   return (
     <div>
       <h4 className="text-white font-semibold mb-4">Review Knowledge (Coming Soon)</h4>
@@ -370,17 +442,35 @@ function Step3ReviewKnowledge({ onComplete }: { onComplete: () => void }) {
         Review and enrich the AI&apos;s knowledge about your hotel.
       </p>
       <button
-        onClick={onComplete}
-        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+        onClick={handleClick}
+        disabled={isSubmitting}
+        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Skip This Step for Now
-        <ArrowRight className="w-4 h-4" />
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          <>
+            Skip This Step for Now
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
       </button>
     </div>
   )
 }
 
 function Step4TestAI({ onComplete }: { onComplete: () => void }) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleClick = async () => {
+    setIsSubmitting(true)
+    await onComplete()
+    setIsSubmitting(false)
+  }
+
   return (
     <div>
       <h4 className="text-white font-semibold mb-4">Test Your AI Assistant (Coming Soon)</h4>
@@ -388,11 +478,21 @@ function Step4TestAI({ onComplete }: { onComplete: () => void }) {
         Try asking questions to see how the AI will respond to your guests.
       </p>
       <button
-        onClick={onComplete}
-        className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
+        onClick={handleClick}
+        disabled={isSubmitting}
+        className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Complete Setup
-        <CheckCircle2 className="w-4 h-4" />
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Completing...
+          </>
+        ) : (
+          <>
+            Complete Setup
+            <CheckCircle2 className="w-4 h-4" />
+          </>
+        )}
       </button>
     </div>
   )
