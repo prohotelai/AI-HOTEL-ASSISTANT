@@ -36,13 +36,15 @@ export default function AdminHeader() {
   // Use AdminContext - this will throw if used outside /admin routes
   const { userName, hotelName, isLoading } = useAdminContext()
 
-  // GUARD: Ensure this component is only used on /admin routes
-  if (!pathname?.startsWith('/dashboard/admin')) {
+  // GUARD: Ensure this component is only used on /admin routes (client-side only)
+  if (typeof window !== 'undefined' && !pathname?.startsWith('/dashboard/admin')) {
     console.error('❌ CRITICAL: AdminHeader used outside /admin routes:', pathname)
     throw new Error('AdminHeader can only be used in /admin routes')
   }
 
-  console.log('✅ ACTIVE DASHBOARD: ADMIN')
+  if (typeof window !== 'undefined') {
+    console.log('✅ ACTIVE DASHBOARD: ADMIN')
+  }
 
   const isActive = (href: string) => {
     if (href === '/dashboard/admin') {

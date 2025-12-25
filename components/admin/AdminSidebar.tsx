@@ -40,8 +40,8 @@ const sidebarItems: SidebarItem[] = [
 export default function AdminSidebar() {
   const pathname = usePathname()
 
-  // GUARD: Ensure this component is only used on /admin routes
-  if (!pathname?.startsWith('/dashboard/admin')) {
+  // GUARD: Ensure this component is only used on /admin routes (client-side only)
+  if (typeof window !== 'undefined' && !pathname?.startsWith('/dashboard/admin')) {
     console.error('❌ CRITICAL: AdminSidebar used outside /admin routes:', pathname)
     throw new Error('AdminSidebar can only be used in /admin routes')
   }

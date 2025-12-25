@@ -40,13 +40,15 @@ export default function DashboardNavigation() {
   const pathname = usePathname()
   const { data: session } = useSession()
 
-  // GUARD: Ensure this component is NOT used on /admin routes
-  if (pathname?.startsWith('/dashboard/admin')) {
+  // GUARD: Ensure this component is NOT used on /admin routes (client-side only)
+  if (typeof window !== 'undefined' && pathname?.startsWith('/dashboard/admin')) {
     console.error('❌ CRITICAL: PMS DashboardNavigation used in /admin routes:', pathname)
     throw new Error('PMS DashboardNavigation cannot be used in /admin routes. Use AdminHeader instead.')
   }
 
-  console.log('✅ ACTIVE DASHBOARD: PMS')
+  if (typeof window !== 'undefined') {
+    console.log('✅ ACTIVE DASHBOARD: PMS')
+  }
 
   const userRole = (session?.user?.role as string)?.toUpperCase() || 'GUEST'
   const hotelId = (session?.user as any)?.hotelId || 'default'
