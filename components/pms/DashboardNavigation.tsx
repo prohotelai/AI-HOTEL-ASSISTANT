@@ -41,7 +41,7 @@ export default function DashboardNavigation() {
   const { data: session } = useSession()
 
   // GUARD: Ensure this component is NOT used on /admin routes (client-side only)
-  if (typeof window !== 'undefined' && pathname?.startsWith('/dashboard/admin')) {
+  if (typeof window !== 'undefined' && (pathname?.startsWith('/admin') || pathname?.startsWith('/dashboard/admin'))) {
     console.error('❌ CRITICAL: PMS DashboardNavigation used in /admin routes:', pathname)
     throw new Error('PMS DashboardNavigation cannot be used in /admin routes. Use AdminHeader instead.')
   }

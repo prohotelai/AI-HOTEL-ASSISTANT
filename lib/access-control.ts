@@ -307,7 +307,7 @@ export async function getDefaultRedirectUrl(userContext: UserContext): Promise<s
 
   // For admins, check onboarding status
   if ((role === 'OWNER' || role === 'ADMIN' || role === 'MANAGER') && hotelId) {
-    return '/dashboard/admin'
+    return '/admin/dashboard'
   }
 
   // Default fallback

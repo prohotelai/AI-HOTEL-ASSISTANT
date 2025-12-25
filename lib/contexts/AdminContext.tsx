@@ -72,7 +72,7 @@ export function useAdminContext() {
   // GUARD: Ensure we're in an admin route
   if (typeof window !== 'undefined') {
     const pathname = window.location.pathname
-    if (!pathname.startsWith('/admin') && !pathname.startsWith('/dashboard/admin')) {
+    if (!pathname.startsWith('/admin')) {
       console.error('❌ CRITICAL: useAdminContext called outside /admin routes:', pathname)
       throw new Error('useAdminContext can only be used in /admin routes')
     }
