@@ -65,20 +65,31 @@ export interface WizardStep4Feedback {
  * Returns null if wizard never started
  */
 export async function getWizardState(hotelId: string): Promise<WizardState | null> {
-  const hotel = await prisma.hotel.findUnique({
-    where: { id: hotelId },
+  const progress = await prisma.onboardingProgress.findUnique({
+    where: { hotelId },
     select: {
-      id: true,
+      status: true,
+      currentStep: true,
+      completedAt: true,
     },
   })
 
-  if (!hotel) return null
+  if (!progress) return null
 
-  // Wizard fields have been removed from Hotel schema
+  // Map OnboardingProgress to WizardState
+  // currentStep is stored as string like "step1", "step2", etc.
+  let step: 1 | 2 | 3 | 4 | null = null
+  if (progress.currentStep) {
+    const stepNum = parseInt(progress.currentStep.replace('step', ''), 10)
+    if (stepNum >= 1 && stepNum <= 4) {
+      step = stepNum as 1 | 2 | 3 | 4
+    }
+  }
+
   return {
-    status: null,
-    step: 1,
-    completedAt: null,
+    status: progress.status === 'COMPLETED' ? 'COMPLETED' : 'IN_PROGRESS',
+    step,
+    completedAt: progress.completedAt,
   }
 }
 
@@ -87,11 +98,20 @@ export async function getWizardState(hotelId: string): Promise<WizardState | nul
  * Sets: step 1, status IN_PROGRESS
  */
 export async function initializeWizard(hotelId: string): Promise<WizardState> {
-  // Wizard fields have been removed from Hotel schema
-  // Return default initialized state
-  
-  // Also sync to user (get first owner user for this hotel)
-  await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 1, null)
+  // Create or update OnboardingProgress
+  const progress = await prisma.onboardingProgress.upsert({
+    where: { hotelId },
+    update: {
+      status: 'IN_PROGRESS',
+      currentStep: 'step1',
+      completedAt: null,
+    },
+    create: {
+      hotelId,
+      status: 'IN_PROGRESS',
+      currentStep: 'step1',
+    },
+  })
 
   return {
     status: 'IN_PROGRESS',
@@ -108,28 +128,30 @@ export async function completeStep1(
   hotelId: string,
   data: WizardStep1Data
 ): Promise<WizardState> {
-  // Update only fields that exist in database
-  const hotel = await prisma.hotel.update({
+  // Update hotel details
+  await prisma.hotel.update({
     where: { id: hotelId },
     data: {
       name: data.hotelName,
-      website: data.websiteUrl,
-      // country, city, hotelType, wizardStep, wizardStatus don't exist in database
-    },
-    select: {
-      id: true,
-      name: true,
+      website: data.websiteUrl || null,
     },
   })
 
-  // Return hardcoded state since wizard fields don't exist
-  const state: WizardState = {
-    step: 2,
-    status: 'IN_PROGRESS',
-    completedAt: null,
-  }
-  return state
-  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 2, null)
+  // Update wizard progress
+  await prisma.onboardingProgress.upsert({
+    where: { hotelId },
+    update: {
+      status: 'IN_PROGRESS',
+      currentStep: 'step2',
+      completedSteps: ['step1'],
+    },
+    create: {
+      hotelId,
+      status: 'IN_PROGRESS',
+      currentStep: 'step2',
+      completedSteps: ['step1'],
+    },
+  })
 
   return {
     status: 'IN_PROGRESS',
@@ -150,10 +172,14 @@ export async function completeStep2(
   // TODO: Implement website scanning logic
   // For now, just move to step 3
 
-  // Note: wizardStep, wizardStatus don't exist in database
-  // await prisma.hotel.update({...})
-
-  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', 3, null)
+  await prisma.onboardingProgress.update({
+    where: { hotelId },
+    data: {
+      status: 'IN_PROGRESS',
+      currentStep: 'step3',
+      completedSteps: ['step1', 'step2'],
+    },
+  })
 
   return {
     status: 'IN_PROGRESS',
@@ -174,8 +200,14 @@ export async function completeStep3(
   // TODO: Store confirmed knowledge in knowledge base
   // For now, just move to step 4
 
-  // Note: wizardStep, wizardStatus don't exist in database
-  // await prisma.hotel.update({...})
+  await prisma.onboardingProgress.update({
+    where: { hotelId },
+    data: {
+      status: 'IN_PROGRESS',
+      currentStep: 'step4',
+      completedSteps: ['step1', 'step2', 'step3'],
+    },
+  })
 
   return {
     status: 'IN_PROGRESS',
@@ -195,10 +227,15 @@ export async function completeStep4(
 ): Promise<WizardState> {
   const now = new Date()
 
-  // Note: wizardStatus, wizardStep, wizardCompletedAt don't exist in database
-  // await prisma.hotel.update({...})
-
-  // await syncWizardStateToUser(hotelId, 'COMPLETED', null, now)
+  await prisma.onboardingProgress.update({
+    where: { hotelId },
+    data: {
+      status: 'COMPLETED',
+      currentStep: null,
+      completedSteps: ['step1', 'step2', 'step3', 'step4'],
+      completedAt: now,
+    },
+  })
 
   return {
     status: 'COMPLETED',
@@ -250,10 +287,22 @@ export async function skipToNextStep(hotelId: string): Promise<WizardState> {
     nextStep = (state.step + 1) as 1 | 2 | 3 | 4
   }
 
-  // Note: wizardStep doesn't exist in database
-  // await prisma.hotel.update({...})
+  const progress = await prisma.onboardingProgress.findUnique({
+    where: { hotelId },
+    select: { completedSteps: true, skippedSteps: true },
+  })
 
-  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', nextStep, null)
+  const completedSteps = (progress?.completedSteps as string[]) || []
+  const skippedSteps = (progress?.skippedSteps as string[]) || []
+  skippedSteps.push(`step${state.step}`)
+
+  await prisma.onboardingProgress.update({
+    where: { hotelId },
+    data: {
+      currentStep: `step${nextStep}`,
+      skippedSteps,
+    },
+  })
 
   return {
     status: 'IN_PROGRESS',
@@ -274,10 +323,12 @@ export async function goToPreviousStep(hotelId: string): Promise<WizardState> {
 
   const prevStep = state.step > 1 ? (state.step - 1) as 1 | 2 | 3 | 4 : 1
 
-  // Note: wizardStep doesn't exist in database
-  // await prisma.hotel.update({...})
-
-  // await syncWizardStateToUser(hotelId, 'IN_PROGRESS', prevStep, null)
+  await prisma.onboardingProgress.update({
+    where: { hotelId },
+    data: {
+      currentStep: `step${prevStep}`,
+    },
+  })
 
   return {
     status: 'IN_PROGRESS',
@@ -303,27 +354,19 @@ export async function migrateFromOldOnboarding(hotelId: string): Promise<void> {
 
   // User exists - mark wizard as complete
   const now = new Date()
-  // Note: wizardStatus, wizardStep, wizardCompletedAt don't exist in database
-  // await prisma.hotel.update({...})
-}
-
-/**
- * INTERNAL: Sync wizard state from Hotel to User
- * Ensures User record mirrors Hotel wizard state for faster queries
- */
-async function syncWizardStateToUser(
-  hotelId: string,
-  status: 'IN_PROGRESS' | 'COMPLETED' | null,
-  step: 1 | 2 | 3 | 4 | null,
-  completedAt: Date | null
-): Promise<void> {
-  try {
-    // Note: wizardStatus, wizardStep, wizardCompletedAt don't exist in database
-    // User fields no longer used for sync since they don't exist
-    // await prisma.user.updateMany({...})
-  } catch (error) {
-    // Log but don't fail if sync fails
-    console.error('Failed to sync wizard state to user:', error)
-  }
+  await prisma.onboardingProgress.upsert({
+    where: { hotelId },
+    update: {
+      status: 'COMPLETED',
+      currentStep: null,
+      completedAt: now,
+    },
+    create: {
+      hotelId,
+      status: 'COMPLETED',
+      currentStep: null,
+      completedAt: now,
+    },
+  })
 }
 

@@ -267,16 +267,8 @@ export default function SetupWizardPage() {
             </Button>
           )}
           <div className="flex-1" />
-          {currentStep < 4 && (
-            <Button
-              onClick={() => handleNextStep()}
-              disabled={submitting}
-              className="flex items-center gap-2"
-            >
-              Next
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          )}
+          {/* Note: Steps 1, 2, and 3 have their own submit buttons within forms */}
+          {/* Only show external Next button if needed for non-form steps */}
         </div>
 
         {/* Step Indicators */}
