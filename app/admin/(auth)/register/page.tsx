@@ -106,9 +106,9 @@ export default function RegisterPage() {
         return
       }
 
-      console.log('✅ Auto-login successful, redirecting to /admin/dashboard')
+      console.log('✅ Auto-login successful, redirecting to /dashboard/admin')
       // Redirect to admin dashboard after successful signup and login
-      router.push('/admin/dashboard')
+      router.push('/dashboard/admin')
     } catch (error: any) {
       setError(error.message || 'An error occurred. Please try again.')
     } finally {
