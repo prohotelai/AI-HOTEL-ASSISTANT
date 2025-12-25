@@ -28,7 +28,6 @@ export interface AdminSignupResult {
   userId: string
   hotelId: string
   email: string
-  onboardingRequired: boolean
 }
 
 /**
@@ -47,13 +46,11 @@ function generateHotelId(): string {
  * - This creates both User AND Hotel atomically
  * - If any step fails, entire transaction rolls back
  * - No orphaned users or hotels left in database
- * - Onboarding wizard DEPENDS on hotel existing at this point
  * 
  * User Setup:
  * - role = OWNER (cannot be changed via API)
  * - hotelId = newly created hotel's ID (required for all operations)
  * - password = bcrypt hashed (cost 12, stronger than default)
- * - onboardingCompleted = false (wizard must be completed before dashboard access)
  * 
  * Hotel Setup:
  * - name = input.hotelName (immutable after signup)
@@ -171,7 +168,6 @@ export async function createHotelAdminSignup(
     userId: result.user.id,
     hotelId: result.hotel.id,
     email: result.user.email,
-    onboardingRequired: true,
   }
 }
 

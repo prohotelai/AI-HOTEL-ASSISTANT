@@ -13,7 +13,7 @@ import { checkAccess, getDefaultRedirectUrl, type UserContext, type UserRole } f
  * Strict Role Enforcement:
  * 1. /admin/** routes:
  *    - Requires: NextAuth session with role in [OWNER, ADMIN, MANAGER]
- *    - Must have: hotelId in session (except /admin/register, /admin/login, /admin/onboarding)
+ *    - Must have: hotelId in session (except /admin/register, /admin/login)
  *    - Assertion: Admin operations MUST include hotelId
  *
  * 2. /staff/** routes:
