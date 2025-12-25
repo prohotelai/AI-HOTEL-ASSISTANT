@@ -31,6 +31,12 @@ model Hotel {
   widgetColor String? @default("#3B82F6")
   widgetTitle String? @default("Chat with us")
 
+  // Hotel Identity QR Code (PERMANENT - Generated ONCE on creation)
+  // This is the hotel's permanent identity QR - NOT regenerable by users
+  // Contains: { "hotelId": "<ID>", "type": "hotel_entry" }
+  qrCode    String? @unique // Permanent QR token/ID
+  qrPayload String? // Static JSON payload for QR content
+
   // API keys for this tenant
   openaiKey   String? // Encrypted in production
   pineconeKey String? // Encrypted in production
@@ -125,14 +131,14 @@ model Hotel {
 
 // NextAuth User model
 model User {
-  id               String     @id @default(cuid())
+  id               String    @id @default(cuid())
   name             String?
-  email            String     @unique
+  email            String    @unique
   emailVerified    DateTime?
   password         String? // Hashed (for ADMIN/OWNER)
   image            String?
-  role             String     @default("GUEST") // Changed from enum to String for compatibility
-  isSuspended      Boolean    @default(false)
+  role             String    @default("GUEST") // Changed from enum to String for compatibility
+  isSuspended      Boolean   @default(false)
   suspendedAt      DateTime?
   suspensionReason String?
 
@@ -471,15 +477,15 @@ model Staff {
   hotel   Hotel  @relation("staffMembers", fields: [hotelId], references: [id], onDelete: Cascade)
 
   // Staff identity (auto-generated, unique per hotel)
-  staffId String // e.g., ST-00001, ST-00002
+  staffId   String // e.g., ST-00001, ST-00002
   firstName String
-  lastName String
-  email String
-  phone String?
+  lastName  String
+  email     String
+  phone     String?
 
   // Role and status
   staffRole StaffRole
-  status StaffStatus @default(PENDING)
+  status    StaffStatus @default(PENDING)
 
   // Optional user account (created later when staff activates)
   userId String? @unique
@@ -487,10 +493,10 @@ model Staff {
 
   // HR metadata
   dateOfBirth DateTime?
-  address String?
-  department String?
-  hireDate DateTime?
-  
+  address     String?
+  department  String?
+  hireDate    DateTime?
+
   // Admin notes
   notes String? @db.Text
 
@@ -511,7 +517,6 @@ model Staff {
   @@index([status])
   @@index([staffRole])
 }
-
 
 // GuestStaffQRTokens: QR code login tokens for guests and staff
 model GuestStaffQRToken {
@@ -566,7 +571,9 @@ model GuestStaffQRToken {
   @@index([revokedAt])
 }
 
-// HotelQRCode: Unified QR code per hotel for access (admin-generated)
+// HotelQRCode: DEPRECATED - Legacy QR system (kept for backward compatibility)
+// NEW APPROACH: Hotel.qrCode field contains permanent QR (generated on hotel creation)
+// This table is read-only now - used only for legacy QR redirects
 // - One active QR code per hotel at a time
 // - Admin can regenerate (invalidates previous)
 // - Content: { hotelId }
@@ -1728,16 +1735,16 @@ model OnboardingProgress {
   hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   // State machine: PENDING → IN_PROGRESS → COMPLETED
-  status        OnboardingStatus @default(PENDING)
-  currentStep   String?          // Last accessed step (can go back)
-  
+  status      OnboardingStatus @default(PENDING)
+  currentStep String? // Last accessed step (can go back)
+
   // Step tracking
-  completedSteps Json    @default("[]") // Array of completed step IDs
-  skippedSteps   Json    @default("[]") // Array of skipped step IDs (can resume)
-  
+  completedSteps Json @default("[]") // Array of completed step IDs
+  skippedSteps   Json @default("[]") // Array of skipped step IDs (can resume)
+
   // Completion metadata
   completedAt DateTime?
-  
+
   // Session metadata
   totalTimeSpent Int @default(0) // seconds
   lastStepTime   Int @default(0) // seconds on current step
@@ -1747,7 +1754,6 @@ model OnboardingProgress {
 
   @@index([hotelId])
   @@index([status])
-
   // Composite index for filtering incomplete onboardings
   @@index([hotelId, status])
 }
@@ -1759,9 +1765,9 @@ model ServiceConfig {
   hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   // Service flags
-  aiGuestChat        Boolean @default(true)  // 24/7 AI chatbot for guests
-  analyticsDashboard Boolean @default(true)  // Guest interactions analytics
-  guestPrivacyMode   Boolean @default(true)  // GDPR-compliant data handling
+  aiGuestChat        Boolean @default(true) // 24/7 AI chatbot for guests
+  analyticsDashboard Boolean @default(true) // Guest interactions analytics
+  guestPrivacyMode   Boolean @default(true) // GDPR-compliant data handling
 
   // Audit
   configuredBy String? // User ID who configured

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { nanoid } from 'nanoid'
+import { generatePermanentHotelQR } from './hotelQrService'
 
 export interface AdminSignupInput {
   name: string
@@ -126,7 +127,10 @@ export async function createHotelAdminSignup(
   // Create user and hotel in atomic transaction
   // If hotel creation fails, user creation rolls back
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Create Hotel
+    // Generate permanent QR code for hotel (ONCE)
+    const { qrCode, qrPayload } = await generatePermanentHotelQR(hotelId)
+
+    // 1. Create Hotel with permanent QR
     const hotel = await tx.hotel.create({
       data: {
         id: hotelId,
@@ -135,6 +139,9 @@ export async function createHotelAdminSignup(
         // Set default plan to STARTER
         subscriptionPlan: SubscriptionPlan.STARTER,
         subscriptionStatus: SubscriptionStatus.ACTIVE,
+        // Permanent QR identity
+        qrCode,
+        qrPayload,
       }
     })
 

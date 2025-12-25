@@ -3,52 +3,56 @@ export const runtime = 'nodejs'
 
 /**
  * POST /api/qr/validate
- * Validate QR token and return hotel ID
+ * Validate permanent hotel QR code
  * Public endpoint - does NOT require authentication
  * Used by /access page to validate QR link
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { validateQRToken } from '@/lib/services/qrCodeService'
+import { validateHotelQr } from '@/lib/services/hotelQrService'
 
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json()
-    const { token } = body
+    const { qrCode, token } = body
+
+    // Support both 'qrCode' and 'token' for backward compatibility
+    const qrToken = qrCode || token
 
     // Validate required fields
-    if (!token) {
+    if (!qrToken) {
       return NextResponse.json(
-        { error: 'Missing required field: token' },
+        { error: 'Missing required field: qrCode' },
         { status: 400 }
       )
     }
 
-    // Validate QR token
-    const content = await validateQRToken(token)
+    // Validate QR code
+    const hotelInfo = await validateHotelQr(qrToken)
 
-    if (!content) {
+    if (!hotelInfo) {
       return NextResponse.json(
-        { error: 'Invalid or expired QR token' },
+        { error: 'Invalid or expired QR code' },
         { status: 401 }
       )
     }
 
-    // Return hotel ID from QR content
+    // Return hotel info
     return NextResponse.json(
       {
         success: true,
-        hotelId: content.hotelId,
-        content,
-        message: 'QR token validated successfully'
+        hotelId: hotelInfo.hotelId,
+        hotelName: hotelInfo.hotelName,
+        payload: hotelInfo.payload,
+        message: 'QR code validated successfully'
       },
       { status: 200 }
     )
   } catch (error: any) {
-    console.error('QR token validation error:', error)
+    console.error('QR code validation error:', error)
     return NextResponse.json(
-      { error: 'Failed to validate QR token' },
+      { error: 'Failed to validate QR code' },
       { status: 500 }
     )
   }

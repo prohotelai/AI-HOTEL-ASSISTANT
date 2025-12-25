@@ -4,6 +4,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
+/**
+ * DashboardNavigation - PMS Operations Level Navigation
+ * 
+ * STRICT ISOLATION:
+ * - This component MUST NOT be used in /dashboard/admin/** routes
+ * - Only for /dashboard/hotel/**, /dashboard/staff/**, /dashboard/guest/** routes
+ * - Displays PMS-level branding and navigation
+ */
+
 interface NavItem {
   label: string
   href: string
@@ -30,6 +39,14 @@ const getSupportNavItem = (workspaceId: string): NavItem => ({
 export default function DashboardNavigation() {
   const pathname = usePathname()
   const { data: session } = useSession()
+
+  // GUARD: Ensure this component is NOT used on /admin routes
+  if (pathname?.startsWith('/dashboard/admin')) {
+    console.error('❌ CRITICAL: PMS DashboardNavigation used in /admin routes:', pathname)
+    throw new Error('PMS DashboardNavigation cannot be used in /admin routes. Use AdminHeader instead.')
+  }
+
+  console.log('✅ ACTIVE DASHBOARD: PMS')
 
   const userRole = (session?.user?.role as string)?.toUpperCase() || 'GUEST'
   const hotelId = (session?.user as any)?.hotelId || 'default'

@@ -7,7 +7,10 @@ import { Loader2, AlertCircle, Smartphone, UserCheck } from 'lucide-react'
 export default function AccessPageClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const hotelId = searchParams.get('hotelId')
+  
+  // Support both new format (?qr=...) and legacy format (?hotelId=...)
+  const qrCode = searchParams.get('qr')
+  const legacyHotelId = searchParams.get('hotelId')
 
   const [validating, setValidating] = useState(true)
   const [hotel, setHotel] = useState<{ id: string; name: string } | null>(null)
@@ -16,51 +19,79 @@ export default function AccessPageClient() {
     null
   )
   const [redirecting, setRedirecting] = useState(false)
+  const [isLegacyQr, setIsLegacyQr] = useState(false)
 
   // Validate hotel exists and has active QR
   useEffect(() => {
     async function validateAccess() {
-      if (!hotelId) {
-        setError('No hotel ID provided in access link')
-        setValidating(false)
-        return
-      }
+      // Priority: New QR format first, then legacy hotelId
+      if (qrCode) {
+        // NEW FORMAT: Validate QR code
+        try {
+          const res = await fetch('/api/qr/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qrCode })
+          })
 
-      try {
-        // Check hotel exists
-        const hotelRes = await fetch(`/api/hotels/${hotelId}`)
-
-        if (!hotelRes.ok) {
-          if (hotelRes.status === 404) {
-            setError('Hotel not found')
-          } else {
-            setError('Failed to validate access link')
+          if (!res.ok) {
+            const errorData = await res.json()
+            setError(errorData.error || 'Invalid QR code')
+            setValidating(false)
+            return
           }
-          setValidating(false)
-          return
-        }
 
-        const hotelData = await hotelRes.json()
-        setHotel(hotelData.hotel)
-        setValidating(false)
-      } catch (error) {
-        console.error('Access validation error:', error)
-        setError('Failed to validate access link. Please try again.')
+          const data = await res.json()
+          setHotel({ id: data.hotelId, name: data.hotelName })
+          setValidating(false)
+        } catch (error) {
+          console.error('QR validation error:', error)
+          setError('Failed to validate QR code. Please try again.')
+          setValidating(false)
+        }
+      } else if (legacyHotelId) {
+        // LEGACY FORMAT: Direct hotel ID (deprecated but supported)
+        setIsLegacyQr(true)
+        console.warn('⚠️ Legacy QR format detected (hotelId). Please update to new QR code.')
+
+        try {
+          const hotelRes = await fetch(`/api/hotels/${legacyHotelId}`)
+
+          if (!hotelRes.ok) {
+            if (hotelRes.status === 404) {
+              setError('Hotel not found')
+            } else {
+              setError('Failed to validate access link')
+            }
+            setValidating(false)
+            return
+          }
+
+          const hotelData = await hotelRes.json()
+          setHotel(hotelData.hotel)
+          setValidating(false)
+        } catch (error) {
+          console.error('Access validation error:', error)
+          setError('Failed to validate access link. Please try again.')
+          setValidating(false)
+        }
+      } else {
+        setError('No QR code or hotel ID provided in access link')
         setValidating(false)
       }
     }
 
     validateAccess()
-  }, [hotelId])
+  }, [qrCode, legacyHotelId])
 
   const handleGuestAccess = async () => {
-    if (!hotelId) return
+    if (!hotel) return
 
     setRedirecting(true)
 
     try {
       // Redirect guest to identification page (passport/national ID)
-      router.push(`/guest/access?hotelId=${hotelId}`)
+      router.push(`/guest/access?hotelId=${hotel.id}`)
     } catch (error) {
       console.error('Guest access error:', error)
       setError('Failed to access guest access page')
@@ -69,13 +100,13 @@ export default function AccessPageClient() {
   }
 
   const handleStaffAccess = async () => {
-    if (!hotelId) return
+    if (!hotel) return
 
     setRedirecting(true)
 
     try {
       // Redirect to staff login with hotel context
-      router.push(`/staff/access?hotelId=${hotelId}`)
+      router.push(`/staff/access?hotelId=${hotel.id}`)
     } catch (error) {
       console.error('Staff access error:', error)
       setError('Failed to access staff console')
@@ -118,6 +149,21 @@ export default function AccessPageClient() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="bg-white rounded-lg shadow-2xl p-8 max-w-2xl w-full">
+        {/* Legacy QR Warning */}
+        {isLegacyQr && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-yellow-900">Legacy QR Code Detected</p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  You&apos;re using an old QR code format. Please contact your hotel administrator to get the new permanent QR code for better security.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
