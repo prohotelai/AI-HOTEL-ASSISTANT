@@ -37,8 +37,8 @@ function OwnerLoginContent() {
       })
       
       // Default: redirect to admin dashboard
-      console.log('✅ LOGIN: Redirecting to /dashboard/admin')
-      router.push('/dashboard/admin')
+      console.log('✅ LOGIN: Redirecting to /admin/dashboard')
+      router.push('/admin/dashboard')
     }
   }, [session, status, router])
 
