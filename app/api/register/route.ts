@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHotelAdminSignup } from '@/lib/services/adminSignupService'
 import { badRequest, conflict, internalError } from '@/lib/api/errorHandler'
 import { prisma } from '@/lib/prisma'
+import { initializeWizard } from '@/lib/services/wizard/aiSetupWizardService'
 
 /**
  * HOTEL ADMIN REGISTRATION ENDPOINT
@@ -131,6 +132,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // NEW: Initialize wizard for first-time setup
+    try {
+      await initializeWizard(result.hotelId)
+      console.log('✅ Wizard initialized for hotel:', result.hotelId)
+    } catch (wizardError) {
+      console.error('Failed to initialize wizard (non-critical):', wizardError)
+      // Continue even if wizard initialization fails
+    }
+
     // Return success with user and hotel info
     return NextResponse.json(
       {
@@ -140,6 +150,7 @@ export async function POST(req: NextRequest) {
         hotelId: result.hotelId,
         email: result.email,
         onboardingRequired: true,
+        wizardInitialized: true,
       },
       { status: 201 }
     )

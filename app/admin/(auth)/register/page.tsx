@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -89,8 +90,25 @@ export default function RegisterPage() {
 
       console.log('✅ Signup successful:', { hotelId: result.hotelId, userId: result.userId })
 
-      // Redirect to admin login, which will then redirect to onboarding
-      router.push('/admin/login?registered=true')
+      // NEW: Auto-login after signup and redirect to wizard
+      console.log('🔐 Auto-logging in user...')
+      
+      const loginResult = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      })
+
+      if (loginResult?.error) {
+        console.error('Auto-login failed:', loginResult.error)
+        // Fallback: redirect to login page
+        router.push('/admin/login?registered=true')
+        return
+      }
+
+      console.log('✅ Auto-login successful, redirecting to /admin/setup')
+      // Redirect to setup wizard after auto-login
+      router.push('/admin/setup?firstLogin=true')
     } catch (error: any) {
       setError(error.message || 'An error occurred. Please try again.')
     } finally {

@@ -34,6 +34,7 @@ import {
   User,
   Users,
   Webhook,
+  Wand2,
   Zap,
 } from 'lucide-react'
 
@@ -229,6 +230,12 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
               <p className="text-sm text-white/60">Manage staff, QR codes, tickets and system operations</p>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
+              <NavCard
+                icon={<Wand2 className="h-6 w-6" />}
+                title="AI Setup Wizard"
+                description="Configure AI assistant settings"
+                href="/admin/setup"
+              />
               <NavCard
                 icon={<QrCode className="h-6 w-6" />}
                 title="QR Code Management"
