@@ -61,7 +61,7 @@ export default function SetupWizardPage() {
 
       // CRITICAL: If wizard is COMPLETED, redirect to dashboard
       if (state.status === 'COMPLETED') {
-        router.replace('/admin/dashboard')
+        router.replace('/dashboard/admin')
         return
       }
 
@@ -123,7 +123,7 @@ export default function SetupWizardPage() {
 
       // If wizard completed, redirect
       if (newState.status === 'COMPLETED') {
-        router.replace('/admin/dashboard')
+        router.replace('/dashboard/admin')
         return
       }
 
