@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHotelAdminSignup } from '@/lib/services/adminSignupService'
 import { badRequest, conflict, internalError } from '@/lib/api/errorHandler'
 import { prisma } from '@/lib/prisma'
-import { initializeWizard } from '@/lib/services/wizard/aiSetupWizardService'
 
 /**
  * HOTEL ADMIN REGISTRATION ENDPOINT
@@ -15,19 +14,12 @@ import { initializeWizard } from '@/lib/services/wizard/aiSetupWizardService'
  * Flow:
  * 1. Validate all input fields (name, email, password, hotelName)
  * 2. Check email uniqueness in database
- *    - If email exists with registrationStatus=IN_PROGRESS → return status with "resume" flag
- *    - If email exists with registrationStatus=COMPLETED → return conflict error
  * 3. Hash password with bcrypt cost 12 (strong for admin)
  * 4. Create User + Hotel in single transaction:
- *    - User: role=OWNER, hotelId=generated hotel.id, onboardingCompleted=false
+ *    - User: role=OWNER, hotelId=generated hotel.id
  *    - Hotel: name from hotelName input, subscriptionPlan=STARTER, status=ACTIVE
  * 5. On success → Return { userId, hotelId } for session creation
  * 6. On failure → Transaction rolls back (no orphaned records)
- * 
- * CRITICAL: Hotel MUST be created at signup time
- * - Onboarding wizard assumes hotel exists
- * - If hotel missing after signup → wizard will show fatal error
- * - Never delay hotel creation to onboarding step
  * 
  * Security:
  * - Passwords hashed with bcrypt cost 12 (stronger than typical cost 10)
@@ -132,14 +124,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // NEW: Initialize wizard for first-time setup
-    try {
-      await initializeWizard(result.hotelId)
-      console.log('✅ Wizard initialized for hotel:', result.hotelId)
-    } catch (wizardError) {
-      console.error('Failed to initialize wizard (non-critical):', wizardError)
-      // Continue even if wizard initialization fails
-    }
+    console.log('✅ User and hotel created:', { userId: result.userId, hotelId: result.hotelId })
 
     // Return success with user and hotel info
     return NextResponse.json(
@@ -149,8 +134,6 @@ export async function POST(req: NextRequest) {
         userId: result.userId,
         hotelId: result.hotelId,
         email: result.email,
-        onboardingRequired: true,
-        wizardInitialized: true,
       },
       { status: 201 }
     )

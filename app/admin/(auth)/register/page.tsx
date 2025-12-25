@@ -90,7 +90,7 @@ export default function RegisterPage() {
 
       console.log('✅ Signup successful:', { hotelId: result.hotelId, userId: result.userId })
 
-      // NEW: Auto-login after signup and redirect to wizard
+      // Auto-login after signup and redirect to admin dashboard
       console.log('🔐 Auto-logging in user...')
       
       const loginResult = await signIn('credentials', {
@@ -106,9 +106,9 @@ export default function RegisterPage() {
         return
       }
 
-      console.log('✅ Auto-login successful, redirecting to /admin/setup-wizard')
-      // Redirect to setup wizard after auto-login
-      router.push('/admin/setup-wizard')
+      console.log('✅ Auto-login successful, redirecting to /admin/dashboard')
+      // Redirect to admin dashboard after successful signup and login
+      router.push('/admin/dashboard')
     } catch (error: any) {
       setError(error.message || 'An error occurred. Please try again.')
     } finally {

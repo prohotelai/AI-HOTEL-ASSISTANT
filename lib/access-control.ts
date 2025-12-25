@@ -35,21 +35,6 @@ export interface FeatureCheckResult {
 }
 
 /**
- * Get onboarding status for a hotel
- */
-export async function getOnboardingStatus(hotelId: string): Promise<'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null> {
-  try {
-    const progress = await prisma.onboardingProgress.findUnique({
-      where: { hotelId },
-      select: { status: true },
-    })
-    return progress?.status ?? null
-  } catch {
-    return null
-  }
-}
-
-/**
  * Get hotel subscription and features
  */
 export async function getHotelFeatures(hotelId: string) {
@@ -86,7 +71,6 @@ const PERMISSION_MATRIX: Record<
     blockedRoutes: (string | RegExp)[]
     publicRoutes: (string | RegExp)[]
     requirements?: {
-      onboardingRequired?: 'NONE' | 'PENDING' | 'COMPLETED'
       hotelIdRequired?: boolean
     }
   }
@@ -102,7 +86,6 @@ const PERMISSION_MATRIX: Record<
     blockedRoutes: [/^\/staff\//, /^\/guest\//],
     publicRoutes: [],
     requirements: {
-      onboardingRequired: 'COMPLETED',
       hotelIdRequired: true,
     },
   },
@@ -117,7 +100,6 @@ const PERMISSION_MATRIX: Record<
     blockedRoutes: [/^\/staff\//, /^\/guest\//],
     publicRoutes: [],
     requirements: {
-      onboardingRequired: 'COMPLETED',
       hotelIdRequired: true,
     },
   },
@@ -131,7 +113,6 @@ const PERMISSION_MATRIX: Record<
     blockedRoutes: [/^\/admin\/settings/, /^\/staff\//, /^\/guest\//],
     publicRoutes: [],
     requirements: {
-      onboardingRequired: 'COMPLETED',
       hotelIdRequired: true,
     },
   },
@@ -203,7 +184,6 @@ export async function checkAccess(
     /^\/features/,
     /^\/guest\/access/,
     /^\/staff\/activate/,
-    /^\/onboarding/,
     /^\/admin\/register/,
     /^\/admin\/login/,
     /^\/widget-demo/,
@@ -268,50 +248,6 @@ export async function checkAccess(
     }
   }
 
-  // CRITICAL: Admin routes require completed onboarding
-  if (permissions.requirements?.onboardingRequired === 'COMPLETED') {
-    // Skip check for onboarding routes themselves
-    if (!pathname.startsWith('/admin/onboarding')) {
-      try {
-        const onboardingStatus = await getOnboardingStatus(hotelId!)
-        
-        if (onboardingStatus !== 'COMPLETED') {
-          // Redirect to onboarding
-          return {
-            allowed: false,
-            redirectUrl: '/admin/onboarding',
-            httpStatus: 303,
-            reason: 'Onboarding not completed',
-          }
-        }
-      } catch (error) {
-        // If database check fails, log error and allow through
-        // The onboarding check will be done server-side
-        console.error('[ACCESS_CONTROL] Onboarding check failed:', error)
-      }
-    }
-  }
-
-  // If accessing onboarding but already completed, redirect away
-  if (pathname.startsWith('/admin/onboarding')) {
-    try {
-      const onboardingStatus = await getOnboardingStatus(hotelId!)
-      
-      if (onboardingStatus === 'COMPLETED') {
-        return {
-          allowed: false,
-          redirectUrl: '/dashboard/admin',
-          httpStatus: 303,
-          reason: 'Onboarding already completed',
-        }
-      }
-    } catch (error) {
-      // If database check fails, log error and allow through
-      // The onboarding redirect check will be done server-side
-      console.error('[ACCESS_CONTROL] Onboarding redirect check failed:', error)
-    }
-  }
-
   return { allowed: true }
 }
 
@@ -371,33 +307,7 @@ export async function getDefaultRedirectUrl(userContext: UserContext): Promise<s
 
   // For admins, check onboarding status
   if ((role === 'OWNER' || role === 'ADMIN' || role === 'MANAGER') && hotelId) {
-    try {
-      const onboardingStatus = await getOnboardingStatus(hotelId)
-
-      if (onboardingStatus !== 'COMPLETED') {
-        // Get the last incomplete step and redirect to it
-        try {
-          const progress = await prisma.onboardingProgress.findUnique({
-            where: { hotelId },
-            select: { currentStep: true, completedSteps: true },
-          })
-
-          if (progress?.currentStep) {
-            return `/admin/onboarding?step=${progress.currentStep}`
-          }
-        } catch {
-          // Fallback
-        }
-
-        return '/admin/onboarding'
-      }
-
-      return '/dashboard/admin'
-    } catch (error) {
-      console.error('[ACCESS_CONTROL] getDefaultRedirectUrl failed:', error)
-      // Fallback to dashboard on error
-      return '/dashboard/admin'
-    }
+    return '/dashboard/admin'
   }
 
   // Default fallback

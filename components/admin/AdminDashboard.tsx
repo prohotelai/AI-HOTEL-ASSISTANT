@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import Link from 'next/link'
 import {
   Cell,
@@ -14,8 +14,6 @@ import {
   YAxis,
 } from 'recharts'
 import { AdminDashboardData } from '@/lib/services/adminService'
-import { OnboardingProgressWidget } from '@/components/onboarding/OnboardingProgressWidget'
-import type { OnboardingProgressData } from '@/lib/services/onboarding/onboardingStepService'
 import { format } from 'date-fns'
 import {
   AlertCircle,
@@ -53,8 +51,6 @@ function humanize(value: string) {
 }
 
 export function AdminDashboard({ data }: AdminDashboardProps) {
-  const [onboardingProgress, setOnboardingProgress] = useState<OnboardingProgressData | null>(null)
-
   const defaultCurrencyFormatter = useMemo(
     () =>
       new Intl.NumberFormat('en-US', {
@@ -111,11 +107,6 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
             change={`${data.metrics.knowledgeDocuments} total`}
           />
         </section>
-
-        {/* Onboarding Progress */}
-        {onboardingProgress?.status !== 'COMPLETED' && (
-          <OnboardingProgressWidget onOnboardingChange={setOnboardingProgress} />
-        )}
 
         {/* CHARTS */}
         <section className="grid gap-6 lg:grid-cols-3">

@@ -27,50 +27,19 @@ function OwnerLoginContent() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    async function checkAuthAndRedirect() {
-      if (status === 'authenticated' && session?.user) {
-        const user = session.user as any
-        
-        console.log('🔐 LOGIN: User authenticated', {
-          userId: user.id,
-          role: user.role,
-          hotelId: user.hotelId,
-        })
-        
-        // Check if owner needs onboarding (no hotel assigned)
-        if ((user.role === 'OWNER' || user.role === 'owner') && !user.hotelId) {
-          console.log('⚠️ LOGIN: Owner has no hotel, redirecting to onboarding')
-          router.push('/admin/onboarding')
-          return
-        }
-
-        // NEW: Check wizard status before redirecting
-        if (user.hotelId) {
-          try {
-            const wizardResponse = await fetch(`/api/wizard/state?hotelId=${user.hotelId}`)
-            const wizardData = await wizardResponse.json()
-            
-            console.log('🧙 LOGIN: Wizard state', wizardData)
-            
-            // If wizard is not completed, redirect to setup
-            if (wizardData.status !== 'COMPLETED') {
-              console.log('🧙 LOGIN: Wizard incomplete, redirecting to /admin/setup')
-              router.push('/admin/setup')
-              return
-            }
-          } catch (error) {
-            console.error('Failed to check wizard status:', error)
-            // Continue to dashboard on error
-          }
-        }
-        
-        // Default: redirect to admin dashboard
-        console.log('✅ LOGIN: All checks passed, redirecting to /admin/dashboard')
-        router.push('/admin/dashboard')
-      }
+    if (status === 'authenticated' && session?.user) {
+      const user = session.user as any
+      
+      console.log('🔐 LOGIN: User authenticated', {
+        userId: user.id,
+        role: user.role,
+        hotelId: user.hotelId,
+      })
+      
+      // Default: redirect to admin dashboard
+      console.log('✅ LOGIN: Redirecting to /admin/dashboard')
+      router.push('/admin/dashboard')
     }
-    
-    checkAuthAndRedirect()
   }, [session, status, router])
 
   const handleSubmit = async (e: React.FormEvent) => {

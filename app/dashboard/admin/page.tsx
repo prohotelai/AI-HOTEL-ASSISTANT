@@ -4,7 +4,6 @@ import AdminDashboard from '@/components/admin/AdminDashboard'
 import { authOptions } from '@/lib/auth'
 import { Permission, assertPermission } from '@/lib/rbac'
 import { getAdminDashboardData } from '@/lib/services/adminService'
-import { getWizardGuardStatus } from '@/lib/wizard/wizardGuard'
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions)
@@ -18,12 +17,6 @@ export default async function AdminPage() {
       redirect('/dashboard')
     }
     throw error
-  }
-
-  // Check if wizard is completed before allowing dashboard access
-  const wizardStatus = await getWizardGuardStatus(context.hotelId)
-  if (!wizardStatus.isCompleted) {
-    redirect('/admin/setup-wizard')
   }
 
   const data = await getAdminDashboardData(context.hotelId)
