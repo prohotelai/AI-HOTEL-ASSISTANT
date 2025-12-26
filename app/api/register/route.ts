@@ -155,6 +155,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Handle unique constraint errors (email or slug)
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0] || 'unknown'
+      if (field === 'email') {
+        return conflict(
+          'An account with this email already exists',
+          { endpoint: '/api/register', method: 'POST' }
+        )
+      } else if (field === 'slug') {
+        return conflict(
+          'A hotel with this name slug already exists. Please choose a different name.',
+          { endpoint: '/api/register', method: 'POST' }
+        )
+      }
+    }
+
     if (error.message?.includes('validation') || error.message?.includes('invalid')) {
       return badRequest(
         error.message || 'Validation failed',
@@ -163,6 +179,13 @@ export async function POST(req: NextRequest) {
     }
 
     // All other errors go through comprehensive error handler
+    console.error('Unexpected error in registration:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack,
+    })
+    
     return internalError(
       error,
       { endpoint: '/api/register', method: 'POST' },

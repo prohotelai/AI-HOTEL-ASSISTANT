@@ -187,13 +187,22 @@ export async function createHotelAdminSignup(
 /**
  * Generate URL-friendly slug from hotel name
  * Example: "Sunset Beach Hotel" → "sunset-beach-hotel"
+ * 
+ * CRITICAL: Ensures slug is never empty (falls back to hotelId if needed)
  */
 function generateSlug(hotelName: string): string {
-  return hotelName
+  const slug = hotelName
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
+  
+  // Fallback: if slug becomes empty (all special chars), use hotel name with dashes
+  if (!slug) {
+    return hotelName.toLowerCase().replace(/\s+/g, '-')
+  }
+  
+  return slug
 }
