@@ -9,8 +9,8 @@ import { useAdminContext } from '@/lib/contexts/AdminContext'
  * AdminHeader - SaaS Platform Level Navigation
  * 
  * STRICT ISOLATION:
- * - This component MUST ONLY be used in /admin/** routes
- * - Uses useAdminContext() - will throw if used outside /admin
+ * - This component MUST ONLY be used in /admin/** routes (and legacy /dashboard/admin/**)
+ * - Uses useAdminContext() - will throw if used outside admin scope
  * - NEVER import or use PMS components
  * - NEVER import or use PMS contexts
  * - Displays SaaS-level branding and navigation
@@ -36,10 +36,13 @@ export default function AdminHeader() {
   // Use AdminContext - this will throw if used outside /admin routes
   const { userName, hotelName, isLoading } = useAdminContext()
 
-  // GUARD: Ensure this component is only used on /admin routes (client-side only)
-  if (typeof window !== 'undefined' && !pathname?.startsWith('/admin') && !pathname?.startsWith('/dashboard/admin')) {
-    console.error('❌ CRITICAL: AdminHeader used outside /admin routes:', pathname)
-    throw new Error('AdminHeader can only be used in /admin routes')
+  // GUARD: Ensure this component is only used on admin routes (client-side only)
+  const isAdminRoute = pathname?.startsWith('/admin') || pathname?.startsWith('/dashboard/admin')
+
+  if (typeof window !== 'undefined' && !isAdminRoute) {
+    console.error('❌ CRITICAL: AdminHeader used outside admin routes:', pathname)
+    // Soft failure: avoid crashing the page; return nothing so layout remains stable
+    return null
   }
 
   // Log dashboard activation ONCE on mount (not on every render)

@@ -16,7 +16,35 @@ import { recordFailedAttempt, clearFailedAttempts } from '@/lib/security/bruteFo
 import { detectSessionHijacking } from '@/lib/security/sessionHijackingPrevention'
 import { prisma } from '@/lib/prisma'
 
-vi.mock('@/lib/prisma')
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    rateLimitEntry: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    bruteForceAttempt: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    session: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    refreshToken: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+  },
+}))
 
 describe('Session Management Integration', () => {
   const testUser = {
@@ -57,6 +85,17 @@ describe('Session Management Integration', () => {
         attempts: 1,
         lastAttempt: new Date(),
         resetAt: new Date(Date.now() + 60000)
+      } as any)
+
+      vi.mocked(prisma.bruteForceAttempt.create).mockResolvedValue({
+        id: 'bf-1',
+        identifier: testMetadata.ipAddress,
+        identifierType: 'ip',
+        failedAttempts: 1,
+        lastAttempt: new Date(),
+        isLocked: false,
+        lockedUntil: null,
+        endpoint: '/api/auth/login'
       } as any)
 
       const rateLimit = await checkRateLimit(testMetadata.ipAddress, '/api/auth/login')
@@ -268,7 +307,7 @@ describe('Session Management Integration', () => {
       const result = detectSessionHijacking(currentMetadata, storedMetadata)
 
       expect(result.suspicious).toBe(true)
-      expect(result.severity).toBeGreaterThanOrEqual('medium')
+      expect(result.severity).toBe('medium')
       expect(result.flags).toContain('DIFFERENT_IP_RANGE')
     })
 

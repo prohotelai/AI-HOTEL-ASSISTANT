@@ -117,7 +117,7 @@ export async function generateQRToken(
     id: qrToken.id,
     hotelId: qrToken.hotelId,
     userId: qrToken.userId || '',
-    token: qrToken.token,
+    token,
     role: qrToken.role as 'guest' | 'staff',
     expiresAt: qrToken.expiresAt,
     isUsed: qrToken.isUsed,
@@ -252,9 +252,11 @@ export async function listActiveTokens(
   offset: number = 0
 ): Promise<{
   tokens: QRTokenResponse[];
-  total: number;
-  limit: number;
-  offset: number;
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
 }> {
   const now = new Date();
 
@@ -304,9 +306,11 @@ export async function listActiveTokens(
       usedAt: t.usedAt,
       createdAt: t.createdAt,
     })),
-    total,
-    limit,
-    offset,
+    pagination: {
+      total,
+      limit,
+      offset,
+    },
   };
 }
 

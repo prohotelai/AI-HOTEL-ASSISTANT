@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BookingStatus, KnowledgeBaseDocumentStatus, TicketStatus } from '@prisma/client'
+import { BookingStatus, TicketStatus } from '@prisma/client'
 import {
   buildBookingTrend,
   summarizeKnowledgeStatuses,
@@ -42,11 +42,11 @@ describe('adminService helpers', () => {
 
   it('summarizeKnowledgeStatuses returns zero for missing statuses', () => {
     const summary = summarizeKnowledgeStatuses([
-      { status: KnowledgeBaseDocumentStatus.READY },
+      { status: 'READY' },
     ])
 
-    const ready = summary.find((row) => row.label === KnowledgeBaseDocumentStatus.READY)
-    const failed = summary.find((row) => row.label === KnowledgeBaseDocumentStatus.FAILED)
+    const ready = summary.find((row) => row.label === 'READY')
+    const failed = summary.find((row) => row.label === 'FAILED')
 
     expect(ready?.value).toBe(1)
     expect(failed?.value).toBe(0)

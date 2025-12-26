@@ -17,8 +17,9 @@ import {
 } from '@/lib/services/pms/externalPMSService'
 import { z } from 'zod'
 
+const allowedTypes = ['OPERA', 'MEWS', 'CLOUDBEDS', 'PROTEL', 'APALEO', 'CUSTOM'] as const
 const testConnectionSchema = z.object({
-  pmsType: z.enum(['OPERA', 'MEWS', 'CLOUDBEDS', 'PROTEL', 'APALEO', 'CUSTOM']),
+  pmsType: z.string().transform((val) => val.toUpperCase()),
   apiKey: z.string().min(10, 'API key must be at least 10 characters'),
   version: z.string().optional(),
   endpoint: z.string().url().optional().or(z.literal(''))
@@ -38,8 +39,16 @@ export const POST = withPermission(Permission.ADMIN_VIEW)(async (req: NextReques
       )
     }
 
+    if ((token as any).role && (token as any).role !== 'admin' && (token as any).role !== 'owner' && (token as any).role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const validated = testConnectionSchema.parse(body)
+
+    if (!allowedTypes.includes(validated.pmsType as any)) {
+      return NextResponse.json({ error: 'Invalid PMS type' }, { status: 400 })
+    }
 
     // Test the connection
     const input: TestConnectionInput = {

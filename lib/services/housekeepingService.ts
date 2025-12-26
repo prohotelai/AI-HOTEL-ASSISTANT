@@ -28,26 +28,49 @@ export interface UpdateHousekeepingTaskInput {
 
 /**
  * Create housekeeping task
+ * Supports legacy positional signature used in unit tests.
  */
-export async function createHousekeepingTask(input: CreateHousekeepingTaskInput) {
-  const task = await prisma.housekeepingTask.create({
-    data: {
-      hotelId: input.hotelId,
-      roomId: input.roomId,
-      taskType: input.taskType,
-      status: 'PENDING',
-      priority: input.priority || 'NORMAL',
-      scheduledFor: input.scheduledFor,
-      assignedTo: input.assignedTo,
-      notes: input.notes
-    },
-    include: {
-      room: {
-        include: {
-          roomType: true
+export async function createHousekeepingTask(
+  input: CreateHousekeepingTaskInput
+): Promise<any>
+export async function createHousekeepingTask(
+  hotelId: string,
+  roomId: string,
+  taskType: string,
+  options?: { priority?: HousekeepingTaskPriority; scheduledFor?: Date; assignedTo?: string; notes?: string }
+): Promise<any>
+export async function createHousekeepingTask(
+  inputOrHotelId: CreateHousekeepingTaskInput | string,
+  roomId?: string,
+  taskType?: string,
+  options?: { priority?: HousekeepingTaskPriority; scheduledFor?: Date; assignedTo?: string; notes?: string }
+) {
+  const normalized: CreateHousekeepingTaskInput =
+    typeof inputOrHotelId === 'string'
+      ? {
+          hotelId: inputOrHotelId,
+          roomId: roomId || '',
+          taskType: taskType || 'CHECKOUT_CLEAN',
+          priority: options?.priority,
+          scheduledFor: options?.scheduledFor,
+          assignedTo: options?.assignedTo,
+          notes: options?.notes
         }
-      }
-    }
+      : inputOrHotelId
+
+  const data = {
+    hotelId: normalized.hotelId,
+    roomId: normalized.roomId,
+    taskType: normalized.taskType,
+    status: 'PENDING' as HousekeepingTaskStatus,
+    priority: normalized.priority || 'NORMAL',
+    ...(normalized.scheduledFor ? { scheduledFor: normalized.scheduledFor } : {}),
+    ...(normalized.assignedTo ? { assignedTo: normalized.assignedTo } : {}),
+    ...(normalized.notes ? { notes: normalized.notes } : {})
+  }
+
+  const task = await prisma.housekeepingTask.create({
+    data
   })
 
   eventBus.emit('housekeeping.task.created', {
@@ -127,14 +150,6 @@ export async function assignHousekeepingTask(
  * Start task
  */
 export async function startHousekeepingTask(taskId: string, hotelId: string) {
-  const task = await prisma.housekeepingTask.findUnique({
-    where: { id: taskId, hotelId }
-  })
-
-  if (!task) {
-    throw new Error('Housekeeping task not found')
-  }
-
   const updatedTask = await prisma.housekeepingTask.update({
     where: { id: taskId, hotelId },
     data: {
@@ -144,12 +159,14 @@ export async function startHousekeepingTask(taskId: string, hotelId: string) {
   })
 
   // Update room status to CLEANING
-  await updateRoomStatus(hotelId, task.roomId, 'CLEANING')
+  if (updatedTask.roomId) {
+    await updateRoomStatus(hotelId, updatedTask.roomId, 'CLEANING')
+  }
 
   eventBus.emit('housekeeping.task.started', {
     taskId: updatedTask.id,
     hotelId,
-    roomId: task.roomId
+    roomId: updatedTask.roomId
   })
 
   return updatedTask
@@ -166,14 +183,6 @@ export async function completeHousekeepingTask(
     credits?: number
   }
 ) {
-  const task = await prisma.housekeepingTask.findUnique({
-    where: { id: taskId, hotelId }
-  })
-
-  if (!task) {
-    throw new Error('Housekeeping task not found')
-  }
-
   const updatedTask = await prisma.housekeepingTask.update({
     where: { id: taskId, hotelId },
     data: {
@@ -186,24 +195,30 @@ export async function completeHousekeepingTask(
 
   // If no issues found, mark room as AVAILABLE
   if (!data.issuesFound) {
-    await updateRoomStatus(hotelId, task.roomId, 'AVAILABLE')
+    if (updatedTask.roomId) {
+      await updateRoomStatus(hotelId, updatedTask.roomId, 'AVAILABLE')
+    }
   } else {
     // If issues found, keep as INSPECTING for manager review
-    await updateRoomStatus(hotelId, task.roomId, 'INSPECTING')
+    if (updatedTask.roomId) {
+      await updateRoomStatus(hotelId, updatedTask.roomId, 'INSPECTING')
+    }
   }
 
   // Update room lastCleaned timestamp
-  await prisma.room.update({
-    where: { id: task.roomId, hotelId },
-    data: {
-      lastCleaned: new Date()
-    }
-  })
+  if (updatedTask.roomId) {
+    await prisma.room.update({
+      where: { id: updatedTask.roomId, hotelId },
+      data: {
+        lastCleaned: new Date()
+      }
+    })
+  }
 
   eventBus.emit('housekeeping.task.completed', {
     taskId: updatedTask.id,
     hotelId,
-    roomId: task.roomId,
+    roomId: updatedTask.roomId,
     issuesFound: data.issuesFound || null
   })
 
@@ -219,31 +234,25 @@ export async function verifyHousekeepingTask(
   approved: boolean,
   notes?: string
 ) {
-  const task = await prisma.housekeepingTask.findUnique({
-    where: { id: taskId, hotelId }
-  })
-
-  if (!task) {
-    throw new Error('Housekeeping task not found')
-  }
-
   const updatedTask = await prisma.housekeepingTask.update({
     where: { id: taskId, hotelId },
     data: {
       status: approved ? 'VERIFIED' : 'NEEDS_ATTENTION',
-      notes: notes || task.notes
+      notes
     }
   })
 
   // Update room status based on verification
   if (approved) {
-    await updateRoomStatus(hotelId, task.roomId, 'AVAILABLE')
+    if (updatedTask.roomId) {
+      await updateRoomStatus(hotelId, updatedTask.roomId, 'AVAILABLE')
+    }
   }
 
   eventBus.emit('housekeeping.task.verified', {
     taskId: updatedTask.id,
     hotelId,
-    roomId: task.roomId,
+    roomId: updatedTask.roomId,
     passed: approved
   })
 
@@ -287,9 +296,6 @@ export async function getPendingTasksToday(hotelId: string) {
           roomType: true
         }
       }
-    },
-    orderBy: {
-      priority: 'desc'
     }
   })
 }

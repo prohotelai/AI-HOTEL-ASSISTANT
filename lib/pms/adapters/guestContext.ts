@@ -91,7 +91,7 @@ type Stay = {
  * Provides information about current guest stay
  */
 export function createStayContext(stay: Stay): StayContext {
-  const isActive = stay.status === 'CHECKED_IN' && stay.checkOutTime > new Date()
+  const isActive = stay.status === 'CHECKED_IN'
 
   return {
     stayId: stay.id,

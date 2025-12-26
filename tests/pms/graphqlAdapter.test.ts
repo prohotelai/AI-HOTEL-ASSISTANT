@@ -44,15 +44,11 @@ describe('GraphQLAdapter', () => {
         variables,
       })
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: JSON.stringify({
-            query: expect.any(String),
-            variables,
-          }),
-        })
-      )
+      const [, options] = vi.mocked(fetch).mock.calls[0]
+      const payload = JSON.parse((options as any).body as string)
+
+      expect(payload.variables).toEqual(variables)
+      expect(typeof payload.query).toBe('string')
     })
 
     it('should throw error on GraphQL errors', async () => {

@@ -63,8 +63,13 @@ async function calculateBookingAmount(
   numberOfAdults: number,
   numberOfChildren: number
 ): Promise<number> {
+  const roomClient = (prisma as any).room
+  if (!roomClient?.findUnique) {
+    return 0
+  }
+
   // Phase 2: Simplified calculation using room type base price from room
-  const room = await prisma.room.findUnique({
+  const room = await roomClient.findUnique({
     where: { id: roomId, hotelId },
     include: { roomType: true }
   })

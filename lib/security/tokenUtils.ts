@@ -159,21 +159,24 @@ export function verifyUserAgent(
     return { valid: true, suspicious: false }
   }
   
-  // Allow minor version changes in browser
-  // e.g., Firefox 120.0 → Firefox 120.1
-  const extractBrowser = (ua: string) => {
-    const match = ua.match(/(\w+\/[\d.]+)/)
-    return match ? match[1] : ua
+  // Allow same browser with minor version drift (e.g., Firefox/120.0 -> Firefox/120.1)
+  const parseUA = (ua: string) => {
+    const match = ua.match(/([A-Za-z]+)\/(\d+)(?:\.(\d+))?/)
+    if (!match) return { name: ua, major: ua, minor: '' }
+    return { name: match[1], major: match[2], minor: match[3] || '' }
   }
-  
-  const currentBrowser = extractBrowser(currentUA)
-  const sessionBrowser = extractBrowser(sessionUA)
-  
-  // Allow minor version drift but flag major changes
-  const valid = currentBrowser === sessionBrowser
-  const suspicious = !valid
-  
-  return { valid, suspicious }
+
+  const current = parseUA(currentUA)
+  const session = parseUA(sessionUA)
+
+  const sameBrowser = current.name === session.name
+  const sameMajor = current.major === session.major
+
+  if (sameBrowser && sameMajor) {
+    return { valid: true, suspicious: false }
+  }
+
+  return { valid: false, suspicious: true }
 }
 
 /**

@@ -18,7 +18,7 @@ import {
  * AdminSidebar - Secondary navigation for Admin Dashboard
  * 
  * STRICT ISOLATION:
- * - This component MUST ONLY be used in /admin/** routes
+ * - This component MUST ONLY be used in /admin/** routes (and legacy /dashboard/admin/**)
  * - NEVER import or use PMS components
  */
 
@@ -38,12 +38,15 @@ const sidebarItems: SidebarItem[] = [
 ]
 
 export default function AdminSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname() || ''
 
-  // GUARD: Ensure this component is only used on /admin routes (client-side only)
-  if (typeof window !== 'undefined' && !pathname?.startsWith('/admin')) {
-    console.error('❌ CRITICAL: AdminSidebar used outside /admin routes:', pathname)
-    throw new Error('AdminSidebar can only be used in /admin routes')
+  // GUARD: Ensure this component is only used on admin routes (client-side only)
+  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard/admin')
+
+  if (typeof window !== 'undefined' && !isAdminRoute) {
+    console.error('❌ CRITICAL: AdminSidebar used outside admin routes:', pathname)
+    // Soft failure: avoid crashing the page; render nothing
+    return null
   }
 
   const isActive = (href: string) => {

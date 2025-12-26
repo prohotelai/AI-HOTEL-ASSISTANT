@@ -21,9 +21,7 @@ describe('RBAC Integration Tests', () => {
       data: {
         id: testHotelId,
         name: 'Test Hotel',
-        location: 'Test City',
-        contactEmail: 'test@hotel.com',
-        phoneNumber: '1234567890'
+        slug: `rbac-${Date.now()}`
       }
     })
 
@@ -38,7 +36,7 @@ describe('RBAC Integration Tests', () => {
 
     // Seed default roles
     await seedDefaultRoles(testHotelId)
-  })
+  }, 40000)
 
   afterAll(async () => {
     // Cleanup test data
@@ -58,11 +56,11 @@ describe('RBAC Integration Tests', () => {
       where: { hotelId: testHotelId }
     })
 
-    await prisma.user.delete({
+    await prisma.user.deleteMany({
       where: { id: testUserId }
     })
 
-    await prisma.hotel.delete({
+    await prisma.hotel.deleteMany({
       where: { id: testHotelId }
     })
   })
@@ -121,11 +119,11 @@ describe('RBAC Integration Tests', () => {
     it('should inherit permissions from role', async () => {
       const adminRole = await prisma.role.findFirst({
         where: { hotelId: testHotelId, key: 'admin' },
-        include: { permissions: true }
+        include: { rolePermissions: { include: { permission: true } } }
       })
 
       expect(adminRole).toBeDefined()
-      expect(adminRole!.permissions.length).toBeGreaterThan(0)
+      expect(adminRole!.rolePermissions.length).toBeGreaterThan(0)
     })
 
     it('should enforce permission hierarchy', async () => {
@@ -150,9 +148,7 @@ describe('RBAC Integration Tests', () => {
         data: {
           id: otherHotelId,
           name: 'Other Hotel',
-          location: 'Other City',
-          contactEmail: 'other@hotel.com',
-          phoneNumber: '0987654321'
+          slug: `rbac-other-${Date.now()}`
         }
       })
 

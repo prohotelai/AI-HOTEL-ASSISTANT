@@ -70,8 +70,8 @@ describe('E2E: PMS Adapter Read-Only', () => {
       })
 
       expect(config).toBeTruthy()
-      expect(config?.pmsVendor).toBe('OPERA')
-      expect(config?.isActive).toBe(true)
+      expect(config?.pmsType).toBe('OPERA')
+      expect(config?.status).toBe('CONNECTED')
 
       // Verify no modifications made
       const configAfter = await prisma.externalPMSConfig.findUnique({
@@ -164,7 +164,7 @@ describe('E2E: PMS Adapter Read-Only', () => {
         where: { id: pmsConfig.id }
       })
 
-      expect(beforeSync?.lastSyncedAt).toBeUndefined()
+      expect(beforeSync?.lastSyncedAt).toBeNull()
 
       // Simulate successful sync - ONLY update timestamp
       const syncTime = new Date()
@@ -302,7 +302,7 @@ describe('E2E: PMS Adapter Read-Only', () => {
         where: { id: pmsConfig.id }
       })
 
-      expect(originalConfig?.isActive).toBe(true)
+      expect(originalConfig?.status).toBe('CONNECTED')
 
       // In real system, this would be blocked by RBAC middleware
       // Here we just verify the state can only be changed by authorized operations
@@ -385,17 +385,15 @@ describe('E2E: Security Validation', () => {
       const maxAttempts = 5
       const windowMs = 60000 // 1 minute
 
-      // Simulate 5 requests (at limit)
-      for (let i = 0; i < maxAttempts; i++) {
-        await prisma.rateLimitEntry.create({
-          data: {
-            identifier: clientId,
-            endpoint,
-            attempts: i + 1,
-            resetAt: new Date(Date.now() + windowMs)
-          }
-        })
-      }
+      // Simulate 5 requests (at limit) using a single aggregated entry
+      await prisma.rateLimitEntry.create({
+        data: {
+          identifier: clientId,
+          endpoint,
+          attempts: maxAttempts,
+          resetAt: new Date(Date.now() + windowMs)
+        }
+      })
 
       // Check rate limit entries
       const entries = await prisma.rateLimitEntry.findMany({
@@ -542,8 +540,7 @@ describe('E2E: Security Validation', () => {
         data: {
           email: 'otheruser@test.com',
           password: 'password',
-          firstName: 'Other',
-          lastName: 'User',
+          name: 'Other User',
           hotelId: otherHotel.id
         }
       })

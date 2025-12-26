@@ -3,57 +3,60 @@ export const runtime = 'nodejs'
 
 /**
  * POST /api/qr/validate
- * Validate permanent hotel QR code
- * Public endpoint - does NOT require authentication
- * Used by /access page to validate QR link
+ * Validate a QR login token and return session info
+ * Public endpoint
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { validateQRToken } from '@/lib/services/qr/qrService'
 import { validateHotelQr } from '@/lib/services/hotelQrService'
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
     const body = await request.json()
-    const { qrCode, token } = body
+    const { token, hotelId, qrCode } = body || {}
 
-    // Support both 'qrCode' and 'token' for backward compatibility
-    const qrToken = qrCode || token
+    // Hotel identity QR validation
+    const hotelQrCode = qrCode
+    if (hotelQrCode) {
+      const validation = await validateHotelQr(hotelQrCode)
+      if (!validation) {
+        return NextResponse.json({ error: 'Invalid or expired QR' }, { status: 401 })
+      }
 
-    // Validate required fields
-    if (!qrToken) {
       return NextResponse.json(
-        { error: 'Missing required field: qrCode' },
-        { status: 400 }
+        {
+          success: true,
+          hotelId: validation.hotelId,
+          hotelName: validation.hotelName,
+          payload: validation.payload
+        },
+        { status: 200 }
       )
     }
 
-    // Validate QR code
-    const hotelInfo = await validateHotelQr(qrToken)
-
-    if (!hotelInfo) {
-      return NextResponse.json(
-        { error: 'Invalid or expired QR code' },
-        { status: 401 }
-      )
+    // Login token validation
+    if (!token || !hotelId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Return hotel info
+    const payload = await validateQRToken(token, hotelId)
+
     return NextResponse.json(
       {
         success: true,
-        hotelId: hotelInfo.hotelId,
-        hotelName: hotelInfo.hotelName,
-        payload: hotelInfo.payload,
-        message: 'QR code validated successfully'
+        session: {
+          hotelId: payload.hotelId,
+          userId: payload.userId,
+          role: payload.role,
+          tokenId: payload.tokenId,
+        },
+        user: payload.user,
       },
       { status: 200 }
     )
   } catch (error: any) {
     console.error('QR code validation error:', error)
-    return NextResponse.json(
-      { error: 'Failed to validate QR code' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
   }
 }

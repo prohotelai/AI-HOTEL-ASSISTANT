@@ -72,11 +72,7 @@ export async function checkRateLimit(
   endpoint: string,
   config?: RateLimitConfig
 ): Promise<RateLimitCheckResult> {
-  const rateConfig = config || DEFAULT_RATE_LIMITS[endpoint] || {
-    endpoint,
-    maxAttempts: 10,
-    windowMs: 60 * 1000
-  }
+  const rateConfig = resolveRateLimitConfig(endpoint, config)
   
   // Phase 1: RateLimitEntry model implemented - full rate limiting active
   const now = new Date()
@@ -114,18 +110,19 @@ export async function checkRateLimit(
     })
   }
   
-  // Increment attempt counter
-  entry = await prisma.rateLimitEntry.update({
+  const attemptsUsed = entry.attempts + 1
+
+  await prisma.rateLimitEntry.update({
     where: { id: entry.id },
     data: {
-      attempts: entry.attempts + 1,
+      attempts: attemptsUsed,
       lastAttempt: now
     }
   })
-  
+
   // Check if limit exceeded
-  const allowed = entry.attempts <= rateConfig.maxAttempts
-  const remaining = Math.max(0, rateConfig.maxAttempts - entry.attempts)
+  const allowed = attemptsUsed <= rateConfig.maxAttempts
+  const remaining = Math.max(0, rateConfig.maxAttempts - attemptsUsed)
   const retryAfterSeconds = allowed ? undefined : Math.ceil((entry.resetAt.getTime() - now.getTime()) / 1000)
   
   return {
@@ -210,24 +207,23 @@ export async function getRateLimitStatus(
     }
   })
   
+  const config = resolveRateLimitConfig(endpoint)
+
   if (!entry) {
     return {
       identifier,
       endpoint,
       attempts: 0,
-      remaining: DEFAULT_RATE_LIMITS[endpoint]?.maxAttempts || 10,
+      remaining: config.maxAttempts,
       resetAt: new Date()
     }
   }
-  
-  const config = DEFAULT_RATE_LIMITS[endpoint]
-  const maxAttempts = config?.maxAttempts || 10
   
   return {
     identifier,
     endpoint,
     attempts: entry.attempts,
-    remaining: Math.max(0, maxAttempts - entry.attempts),
+    remaining: Math.max(0, config.maxAttempts - entry.attempts),
     resetAt: entry.resetAt
   }
 }
@@ -261,11 +257,17 @@ export async function cleanupRateLimitEntries(
  * @returns Rate limit configuration
  */
 export function getRateLimitConfig(endpoint: string): RateLimitConfig {
-  return (
-    DEFAULT_RATE_LIMITS[endpoint] || {
-      endpoint,
-      maxAttempts: 10,
-      windowMs: 60 * 1000
-    }
-  )
+  return resolveRateLimitConfig(endpoint)
+}
+
+function resolveRateLimitConfig(endpoint: string, override?: RateLimitConfig): RateLimitConfig {
+  if (override) return override
+
+  const match = Object.values(DEFAULT_RATE_LIMITS).find((cfg) => cfg.endpoint === endpoint)
+
+  return match || {
+    endpoint,
+    maxAttempts: 10,
+    windowMs: 60 * 1000
+  }
 }

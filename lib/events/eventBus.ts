@@ -258,6 +258,37 @@ export type AppEventMap = {
     userId: string
     housekeepingTaskId: string
   }
+  'staff.invitation.sent': {
+    invitationId: string
+    email: string
+    hotelId: string
+    magicLink: string
+    hotelName?: string | null
+    expiresAt: Date
+    timestamp: Date
+  }
+  'staff.invitation.resent': {
+    invitationId: string
+    email: string
+    hotelId: string
+    magicLink: string
+    hotelName?: string | null
+    expiresAt: Date
+    timestamp: Date
+  }
+  'staff.invitation.accepted': {
+    invitationId: string
+    userId: string
+    email: string
+    hotelId: string
+    timestamp: Date
+  }
+  'staff.invitation.cancelled': {
+    invitationId: string
+    email: string
+    hotelId: string
+    timestamp: Date
+  }
 }
 
 class TypedEventBus {
@@ -283,7 +314,10 @@ class TypedEventBus {
     try {
       // Validate hotelId exists for multi-tenant isolation
       if (!('hotelId' in payload) || !payload.hotelId) {
-        console.error(`[EventBus] Event ${String(event)} missing hotelId - potential data leakage risk`)
+        console.error(
+          `[EventBus] Event ${String(event)} missing hotelId - potential data leakage risk`,
+          payload
+        )
         return
       }
 
@@ -325,8 +359,6 @@ class TypedEventBus {
         await listener(payload)
       } catch (error) {
         console.error(`[EventBus] Error in listener for ${String(event)}:`, error)
-        // Emit error event for monitoring
-        this.emitter.emit('error', error)
       }
     }
 

@@ -17,25 +17,35 @@ export enum DashboardType {
   UNKNOWN = 'UNKNOWN'
 }
 
+function normalizePath(pathname: string | undefined | null): string {
+  return typeof pathname === 'string' ? pathname : ''
+}
+
 /**
  * Determine which dashboard type a route belongs to
  */
 export function getDashboardType(pathname: string): DashboardType {
-  if (pathname.startsWith('/dashboard/admin')) {
+  const path = normalizePath(pathname)
+
+  if (!path) {
+    return DashboardType.UNKNOWN
+  }
+
+  if (path.startsWith('/dashboard/admin')) {
     return DashboardType.ADMIN
   }
   
   if (
-    pathname.startsWith('/dashboard/hotel') ||
-    pathname.startsWith('/dashboard/staff') ||
-    pathname.startsWith('/dashboard/guest') ||
-    pathname.startsWith('/dashboard/analytics')
+    path.startsWith('/dashboard/hotel') ||
+    path.startsWith('/dashboard/staff') ||
+    path.startsWith('/dashboard/guest') ||
+    path.startsWith('/dashboard/analytics')
   ) {
     return DashboardType.PMS
   }
 
   // /dashboard root or other dashboard routes default to PMS
-  if (pathname.startsWith('/dashboard')) {
+  if (path.startsWith('/dashboard')) {
     return DashboardType.PMS
   }
 

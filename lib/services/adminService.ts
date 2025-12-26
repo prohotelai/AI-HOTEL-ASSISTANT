@@ -48,6 +48,7 @@ type KnowledgeDocumentRow = {
   updatedAt: string
 }
 
+
 type HotelSummary = {
   id: string
   name: string

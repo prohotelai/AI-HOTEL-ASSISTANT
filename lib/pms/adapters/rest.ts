@@ -47,24 +47,33 @@ export class RESTAdapter {
       headers['Content-Type'] = 'application/json'
     }
 
-    const controller = new AbortController()
-    const timeout = options.timeout ?? 30000
-
-    const timeoutId = setTimeout(() => controller.abort(), timeout)
-
     let lastError: Error | null = null
     let delay = this.retryOptions.initialDelay
 
     for (let attempt = 0; attempt <= this.retryOptions.maxRetries; attempt++) {
-      try {
-        const response = await fetch(url, {
-          method,
-          headers,
-          body: options.body ? JSON.stringify(options.body) : undefined,
-          signal: controller.signal,
-        })
+      const controller = new AbortController()
+      const timeout = options.timeout ?? 30000
 
-        clearTimeout(timeoutId)
+      try {
+        const response = (await Promise.race([
+          fetch(url, {
+            method,
+            headers,
+            body: options.body ? JSON.stringify(options.body) : undefined,
+            signal: controller.signal,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => {
+              controller.abort()
+              reject(
+                new PMSIntegrationError('PMS API request timed out', {
+                  statusCode: 504,
+                  code: 'TIMEOUT',
+                })
+              )
+            }, timeout)
+          ),
+        ])) as Response
 
         if (!response.ok) {
           // Check if status code is retryable
@@ -103,7 +112,6 @@ export class RESTAdapter {
 
         return (await response.text()) as T
       } catch (error) {
-        clearTimeout(timeoutId)
 
         if (error instanceof PMSIntegrationError) {
           throw error

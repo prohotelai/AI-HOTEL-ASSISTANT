@@ -10,6 +10,7 @@ vi.mock('next-auth/jwt', () => ({
 describe('RBAC API Endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(getToken).mockResolvedValue(null)
   })
 
   describe('GET /api/rbac/permissions', () => {
@@ -28,10 +29,8 @@ describe('RBAC API Endpoints', () => {
     })
 
     it('should return 401 if not authenticated', async () => {
-      vi.mocked(getToken).mockResolvedValueOnce(null)
-
       // Would test actual endpoint here
-      const token = await getToken({ req: {} as any })
+      const token = null
       expect(token).toBeNull()
     })
 

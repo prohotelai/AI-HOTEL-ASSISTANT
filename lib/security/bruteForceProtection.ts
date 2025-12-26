@@ -45,81 +45,63 @@ export async function recordFailedAttempt(
   endpoint: string,
   config: BruteForceConfig = DEFAULT_BRUTE_FORCE_CONFIG
 ): Promise<BruteForceCheckResult> {
-  // Stubbed - bruteForceAttempt model not in schema
-  return {
-    allowed: true,
-    isLocked: false,
-    attemptCount: 0
-  }
-  
-  /* const now = new Date()
+  const now = new Date()
   const lockoutEnd = new Date(now.getTime() + config.lockoutDurationMs)
-  
-  // Find existing record
+
   let attempt = await prisma.bruteForceAttempt.findUnique({
     where: {
-      identifier_identifierType: {
-        identifier,
-        identifierType
-      }
+      identifier
     }
   })
-  
+
   if (!attempt) {
-    // Create new record
     attempt = await prisma.bruteForceAttempt.create({
       data: {
         identifier,
-        identifierType,
-        failedAttempts: 1,
+        attemptCount: 1,
         lastAttempt: now,
         isLocked: false,
-        endpoint
+        lockedUntil: null,
+        metadata: { identifierType, endpoint }
+      }
+    })
+  } else if (attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil < now) {
+    attempt = await prisma.bruteForceAttempt.update({
+      where: { identifier },
+      data: {
+        attemptCount: 1,
+        lastAttempt: now,
+        isLocked: false,
+        lockedUntil: null
       }
     })
   } else {
-    // Check if previous lockout has expired
-    if (attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil < now) {
-      // Lockout expired, reset
-      attempt = await prisma.bruteForceAttempt.update({
-        where: { id: attempt.id },
-        data: {
-          failedAttempts: 1,
-          lastAttempt: now,
-          isLocked: false,
-          lockedUntil: null
-        }
-      })
-    } else {
-      // Increment failed attempts
-      const newFailedAttempts = attempt.failedAttempts + 1
-      const shouldLock = newFailedAttempts >= config.maxFailedAttempts
-      
-      attempt = await prisma.bruteForceAttempt.update({
-        where: { id: attempt.id },
-        data: {
-          failedAttempts: newFailedAttempts,
-          lastAttempt: now,
-          isLocked: shouldLock,
-          lockedUntil: shouldLock ? lockoutEnd : null
-        }
-      })
-    }
+    const newAttemptCount = attempt.attemptCount + 1
+    const shouldLock = newAttemptCount >= config.maxFailedAttempts
+
+    attempt = await prisma.bruteForceAttempt.update({
+      where: { identifier },
+      data: {
+        attemptCount: newAttemptCount,
+        lastAttempt: now,
+        isLocked: shouldLock,
+        lockedUntil: shouldLock ? lockoutEnd : null
+      }
+    })
   }
-  
-  // Check if currently locked
-  const isLocked = attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil > now
+
+  const isLocked = !!(attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil > now)
   const lockoutRemainingSeconds = isLocked && attempt.lockedUntil
     ? Math.ceil((attempt.lockedUntil.getTime() - now.getTime()) / 1000)
     : undefined
-  
+
   return {
     allowed: !isLocked,
     isLocked,
-    attemptCount: attempt.failedAttempts,
+    attemptCount: attempt.attemptCount,
     lockedUntil: attempt.lockedUntil || undefined,
     lockoutRemainingSeconds
-  } */
+  }
 }
 
 /**
@@ -132,24 +114,14 @@ export async function checkBruteForceStatus(
   identifier: string,
   identifierType: IdentifierType
 ): Promise<BruteForceCheckResult> {
-  // Stubbed - bruteForceAttempt model not in schema
-  return {
-    allowed: true,
-    isLocked: false,
-    attemptCount: 0
-  }
-  
-  /* const now = new Date()
-  
+  const now = new Date()
+
   const attempt = await prisma.bruteForceAttempt.findUnique({
     where: {
-      identifier_identifierType: {
-        identifier,
-        identifierType
-      }
+      identifier
     }
   })
-  
+
   if (!attempt) {
     return {
       allowed: true,
@@ -157,37 +129,35 @@ export async function checkBruteForceStatus(
       attemptCount: 0
     }
   }
-  
-  // Check if lockout has expired
-  const isLocked = attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil > now
+
+  const isLocked = !!(attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil > now)
   const lockoutRemainingSeconds = isLocked && attempt.lockedUntil
     ? Math.ceil((attempt.lockedUntil.getTime() - now.getTime()) / 1000)
     : undefined
-  
-  // Auto-unlock if lockout duration expired
+
   if (attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil < now) {
     await prisma.bruteForceAttempt.update({
-      where: { id: attempt.id },
+      where: { identifier },
       data: {
         isLocked: false,
         lockedUntil: null
       }
     })
-    
+
     return {
       allowed: true,
       isLocked: false,
-      attemptCount: attempt.failedAttempts
+      attemptCount: attempt.attemptCount
     }
   }
-  
+
   return {
     allowed: !isLocked,
     isLocked,
-    attemptCount: attempt.failedAttempts,
+    attemptCount: attempt.attemptCount,
     lockedUntil: attempt.lockedUntil || undefined,
     lockoutRemainingSeconds
-  } */
+  }
 }
 
 /**
@@ -200,20 +170,17 @@ export async function clearFailedAttempts(
   identifier: string,
   identifierType: IdentifierType
 ) {
-  // Stubbed - bruteForceAttempt model not in schema
-  return { count: 0 }
-  /* return prisma.bruteForceAttempt.updateMany({
+  return prisma.bruteForceAttempt.updateMany({
     where: {
-      identifier,
-      identifierType
+      identifier
     },
     data: {
-      failedAttempts: 0,
+      attemptCount: 0,
       lastAttempt: new Date(),
       isLocked: false,
       lockedUntil: null
     }
-  }) */
+  })
 }
 
 /**
@@ -225,18 +192,15 @@ export async function manuallyUnlock(
   identifier: string,
   identifierType: IdentifierType
 ) {
-  // Stubbed - bruteForceAttempt model not in schema
-  return { count: 0 }
-  /* return prisma.bruteForceAttempt.updateMany({
+  return prisma.bruteForceAttempt.updateMany({
     where: {
-      identifier,
-      identifierType
+      identifier
     },
     data: {
       isLocked: false,
       lockedUntil: null
     }
-  }) */
+  })
 }
 
 /**
@@ -249,22 +213,12 @@ export async function getBruteForceHistory(
   identifier: string,
   identifierType: IdentifierType
 ) {
-  // Stubbed - bruteForceAttempt model not in schema
-  return {
-    identifier,
-    identifierType,
-    found: false
-  }
-  
-  /* const attempt = await prisma.bruteForceAttempt.findUnique({
+  const attempt = await prisma.bruteForceAttempt.findUnique({
     where: {
-      identifier_identifierType: {
-        identifier,
-        identifierType
-      }
+      identifier
     }
   })
-  
+
   if (!attempt) {
     return {
       identifier,
@@ -272,23 +226,24 @@ export async function getBruteForceHistory(
       found: false
     }
   }
-  
+
   const now = new Date()
-  const isLocked = attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil > now
-  
+  const isLocked = !!(attempt.isLocked && attempt.lockedUntil && attempt.lockedUntil > now)
+  const metadata = (attempt.metadata as any) || {}
+
   return {
     identifier,
     identifierType,
     found: true,
-    failedAttempts: attempt.failedAttempts,
+    failedAttempts: attempt.attemptCount,
     lastAttempt: attempt.lastAttempt,
     isLocked,
     lockedUntil: attempt.lockedUntil,
-    endpoint: attempt.endpoint,
+    endpoint: metadata.endpoint,
     lockoutRemainingSeconds: isLocked && attempt.lockedUntil
       ? Math.ceil((attempt.lockedUntil.getTime() - now.getTime()) / 1000)
       : undefined
-  } */
+  }
 }
 
 /**
@@ -299,29 +254,32 @@ export async function getBruteForceHistory(
 export async function getLockedIdentifiers(
   identifierType?: IdentifierType
 ) {
-  // Stubbed - bruteForceAttempt model not in schema
-  return []
-  /* const now = new Date()
-  
+  const now = new Date()
+
   const locked = await prisma.bruteForceAttempt.findMany({
     where: {
       isLocked: true,
-      lockedUntil: { gt: now },
-      ...(identifierType && { identifierType })
+      lockedUntil: { gt: now }
     },
     select: {
       identifier: true,
-      identifierType: true,
-      failedAttempts: true,
+      attemptCount: true,
       lockedUntil: true,
-      endpoint: true
+      metadata: true
     }
   })
-  
-  return locked.map(record => ({
-    ...record,
-    lockoutRemainingSeconds: Math.ceil((record.lockedUntil!.getTime() - now.getTime()) / 1000)
-  })) */
+
+  return locked.map(record => {
+    const metadata = (record.metadata as any) || {}
+    return {
+      identifier: record.identifier,
+      identifierType: metadata.identifierType || identifierType,
+      failedAttempts: record.attemptCount,
+      lockedUntil: record.lockedUntil,
+      endpoint: metadata.endpoint,
+      lockoutRemainingSeconds: Math.ceil((record.lockedUntil!.getTime() - now.getTime()) / 1000)
+    }
+  })
 }
 
 /**
@@ -331,21 +289,16 @@ export async function getLockedIdentifiers(
 export async function cleanupBruteForceRecords(
   olderThanMs: number = 24 * 60 * 60 * 1000 // 24 hours
 ) {
-  // Stubbed - bruteForceAttempt model not in schema
   const cutoff = new Date(Date.now() - olderThanMs)
-  return {
-    deletedCount: 0,
-    cutoffDate: cutoff
-  }
-  
-  /* const deleted = await prisma.bruteForceAttempt.deleteMany({
+
+  const deleted = await prisma.bruteForceAttempt.deleteMany({
     where: {
       lastAttempt: { lt: cutoff }
     }
   })
-  
+
   return {
     deletedCount: deleted.count,
     cutoffDate: cutoff
-  } */
+  }
 }

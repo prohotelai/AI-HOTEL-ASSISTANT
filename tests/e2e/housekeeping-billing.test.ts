@@ -72,7 +72,6 @@ describe('E2E: Housekeeping Workflow', () => {
         phone: '+1987654321'
       }
     })
-
     // Create staff user
     staffUser = await prisma.user.create({
       data: {
@@ -293,7 +292,7 @@ describe('E2E: Housekeeping Workflow', () => {
       await prisma.housekeepingTask.update({
         where: { id: task.id },
         data: {
-          status: 'CLEANING',
+          status: 'IN_PROGRESS',
           startedAt: startTime
         }
       })
@@ -324,7 +323,7 @@ describe('E2E: Housekeeping Workflow', () => {
           hotelId: testHotel.id,
           roomId: room.id,
           taskType: 'CHECKOUT_CLEAN',
-          status: 'CLEANING',
+          status: 'IN_PROGRESS',
           priority: 'HIGH',
           assignedTo: staffUser.id,
           startedAt: new Date()
@@ -343,7 +342,7 @@ describe('E2E: Housekeeping Workflow', () => {
       // Mark room as needing maintenance
       await prisma.room.update({
         where: { id: room.id },
-        data: { status: 'MAINTENANCE_REQUIRED' }
+        data: { status: 'MAINTENANCE' }
       })
 
       const updatedTask = await prisma.housekeepingTask.findUnique({
@@ -357,7 +356,7 @@ describe('E2E: Housekeeping Workflow', () => {
         where: { id: room.id }
       })
 
-      expect(updatedRoom?.status).toBe('MAINTENANCE_REQUIRED')
+      expect(updatedRoom?.status).toBe('MAINTENANCE')
     })
   })
 })

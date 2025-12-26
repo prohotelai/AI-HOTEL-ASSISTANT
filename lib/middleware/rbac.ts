@@ -48,7 +48,7 @@ export async function hasPermission(
     }
 
     // المالك لديه جميع الصلاحيات
-    if (user.role === SystemRole.OWNER) {
+    if ((user.role || '').toUpperCase() === SystemRole.OWNER) {
       return true
     }
 
@@ -81,7 +81,7 @@ export function withPermission(permission: Permission) {
 
         if (!session || !session.user) {
           return NextResponse.json(
-            { error: 'غير مصرح - يجب تسجيل الدخول', message: 'Unauthorized - Please login' },
+            { error: 'Unauthorized - Please login', message: 'Unauthorized - Please login' },
             { status: 401 }
           )
         }
@@ -91,7 +91,7 @@ export function withPermission(permission: Permission) {
         // التحقق من hotelId
         if (!user.hotelId) {
           return NextResponse.json(
-            { error: 'غير مصرح - لا يوجد فندق مرتبط', message: 'Unauthorized - No hotel associated' },
+            { error: 'Unauthorized - No hotel associated', message: 'Unauthorized - No hotel associated' },
             { status: 403 }
           )
         }
@@ -99,7 +99,7 @@ export function withPermission(permission: Permission) {
         if (user.isSuspended) {
           return NextResponse.json(
             {
-              error: 'تم تعليق الحساب',
+              error: 'Account suspended - access temporarily disabled',
               message: 'Account suspended - access temporarily disabled'
             },
             { status: 403 }
@@ -112,7 +112,7 @@ export function withPermission(permission: Permission) {
         if (!hasAccess) {
           return NextResponse.json(
             { 
-              error: 'ممنوع - ليس لديك صلاحية للوصول', 
+              error: 'Forbidden - You do not have permission to access this resource', 
               message: 'Forbidden - You do not have permission to access this resource',
               requiredPermission: permission
             },
@@ -145,7 +145,7 @@ export function withAnyPermission(permissions: Permission[]) {
 
         if (!session || !session.user) {
           return NextResponse.json(
-            { error: 'غير مصرح - يجب تسجيل الدخول', message: 'Unauthorized - Please login' },
+            { error: 'Unauthorized - Please login', message: 'Unauthorized - Please login' },
             { status: 401 }
           )
         }
@@ -154,7 +154,7 @@ export function withAnyPermission(permissions: Permission[]) {
 
         if (!user.hotelId) {
           return NextResponse.json(
-            { error: 'غير مصرح - لا يوجد فندق مرتبط', message: 'Unauthorized - No hotel associated' },
+            { error: 'Unauthorized - No hotel associated', message: 'Unauthorized - No hotel associated' },
             { status: 403 }
           )
         }
@@ -162,7 +162,7 @@ export function withAnyPermission(permissions: Permission[]) {
         if (user.isSuspended) {
           return NextResponse.json(
             {
-              error: 'تم تعليق الحساب',
+              error: 'Account suspended - access temporarily disabled',
               message: 'Account suspended - access temporarily disabled'
             },
             { status: 403 }
@@ -181,7 +181,7 @@ export function withAnyPermission(permissions: Permission[]) {
         if (!hasAccess) {
           return NextResponse.json(
             { 
-              error: 'ممنوع - ليس لديك صلاحية للوصول', 
+              error: 'Forbidden - You do not have any of the required permissions', 
               message: 'Forbidden - You do not have any of the required permissions',
               requiredPermissions: permissions
             },
@@ -213,7 +213,7 @@ export function withRole(roles: string[]) {
 
         if (!session || !session.user) {
           return NextResponse.json(
-            { error: 'غير مصرح - يجب تسجيل الدخول', message: 'Unauthorized - Please login' },
+            { error: 'Unauthorized - Please login', message: 'Unauthorized - Please login' },
             { status: 401 }
           )
         }
@@ -223,7 +223,7 @@ export function withRole(roles: string[]) {
         if (!roles.includes(user.role)) {
           return NextResponse.json(
             { 
-              error: 'ممنوع - ليس لديك الدور المطلوب', 
+              error: 'Forbidden - You do not have the required role', 
               message: 'Forbidden - You do not have the required role',
               requiredRoles: roles,
               yourRole: user.role

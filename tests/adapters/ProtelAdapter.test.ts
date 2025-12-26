@@ -42,6 +42,8 @@ describe('ProtelAdapter', () => {
       }
     }
     vi.mocked(axios.create).mockReturnValue(mockAxiosInstance as any)
+    // Populate mock results for direct access in tests
+    axios.create({})
   })
 
   afterEach(() => {
@@ -180,6 +182,7 @@ describe('ProtelAdapter', () => {
       const mockAxiosInstance = vi.mocked(axios.create).mock.results[0].value
       mockAxiosInstance.post.mockResolvedValue({ data: mockXMLResponse })
 
+      mockConfig.metadata!.skipConnectionTest = true
       await adapter.connect(mockConfig)
       const rooms = await adapter.syncRooms('test-hotel-123', mockConfig)
 
@@ -204,6 +207,7 @@ describe('ProtelAdapter', () => {
       const mockAxiosInstance = vi.mocked(axios.create).mock.results[0].value
       mockAxiosInstance.post.mockResolvedValue({ data: mockXMLResponse })
 
+      mockConfig.metadata!.skipConnectionTest = true
       await adapter.connect(mockConfig)
       const rooms = await adapter.syncRooms('test-hotel-123', mockConfig)
 
@@ -327,6 +331,7 @@ describe('ProtelAdapter', () => {
       const mockAxiosInstance = vi.mocked(axios.create).mock.results[0].value
       mockAxiosInstance.post.mockResolvedValue({ data: mockXMLResponse })
 
+      mockConfig.metadata!.skipConnectionTest = true
       await adapter.connect(mockConfig)
       await expect(
         adapter.cancelBooking('test-hotel-123', mockConfig, 'RES-001')
@@ -340,6 +345,7 @@ describe('ProtelAdapter', () => {
       const mockAxiosInstance = vi.mocked(axios.create).mock.results[0].value
       mockAxiosInstance.post.mockResolvedValue({ data: mockXMLResponse })
 
+      mockConfig.metadata!.skipConnectionTest = true
       await adapter.connect(mockConfig)
 
       // The rate limiter is attached as an interceptor
@@ -359,6 +365,7 @@ describe('ProtelAdapter', () => {
         message: 'Request failed with status 500'
       })
 
+      mockConfig.metadata!.skipConnectionTest = true
       await adapter.connect(mockConfig)
 
       await expect(
@@ -426,6 +433,8 @@ describe('ProtelAdapter', () => {
         const mockAxiosInstance = vi.mocked(axios.create).mock.results[0].value
         mockAxiosInstance.post.mockResolvedValue({ data: mockXMLResponse })
 
+        mockConfig.metadata!.skipConnectionTest = true
+        mockConfig.metadata!.skipConnectionTest = true
         await adapter.connect(mockConfig)
         const rooms = await adapter.syncRooms('test-hotel-123', mockConfig)
         

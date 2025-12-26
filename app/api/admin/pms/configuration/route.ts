@@ -19,8 +19,9 @@ import {
 } from '@/lib/services/pms/externalPMSService'
 import { z } from 'zod'
 
+const allowedTypes = ['OPERA', 'MEWS', 'CLOUDBEDS', 'PROTEL', 'APALEO', 'CUSTOM'] as const
 const saveConfigSchema = z.object({
-  pmsType: z.enum(['OPERA', 'MEWS', 'CLOUDBEDS', 'PROTEL', 'APALEO', 'CUSTOM']),
+  pmsType: z.string().transform((val) => val.toUpperCase()),
   apiKey: z.string().min(10),
   version: z.string().optional(),
   endpoint: z.string().url().optional().or(z.literal(''))
@@ -40,6 +41,10 @@ export const GET = withPermission(Permission.ADMIN_VIEW)(async (req: NextRequest
       )
     }
 
+    if ((token as any).role && (token as any).role !== 'admin' && (token as any).role !== 'owner' && (token as any).role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const config = await getPMSConfiguration(token.hotelId as string)
 
     if (!config) {
@@ -51,13 +56,17 @@ export const GET = withPermission(Permission.ADMIN_VIEW)(async (req: NextRequest
 
     // Return config without encrypted API key
     return NextResponse.json({
-      configured: true,
-      pmsType: config.pmsType,
-      version: config.version,
-      endpoint: config.endpoint,
-      status: config.status,
-      lastSyncedAt: config.lastSyncedAt,
-      lastError: config.lastError
+      config: {
+        id: config.id,
+        hotelId: config.hotelId,
+        pmsType: config.pmsType,
+        version: config.version,
+        endpoint: config.endpoint,
+        status: config.status,
+        isActive: (config as any).isActive ?? config.status === 'CONNECTED',
+        lastSyncedAt: config.lastSyncedAt,
+        lastError: config.lastError
+      }
     })
 
   } catch (error) {
@@ -86,8 +95,16 @@ export const POST = withPermission(Permission.ADMIN_VIEW)(async (req: NextReques
       )
     }
 
+    if ((token as any).role && (token as any).role !== 'admin' && (token as any).role !== 'owner' && (token as any).role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const validated = saveConfigSchema.parse(body)
+
+    if (!allowedTypes.includes(validated.pmsType as any)) {
+      return NextResponse.json({ error: 'Invalid PMS type' }, { status: 400 })
+    }
 
     const input: SaveConfigurationInput = {
       hotelId: token.hotelId as string,
@@ -142,6 +159,10 @@ export const DELETE = withPermission(Permission.ADMIN_VIEW)(async (req: NextRequ
         { error: 'Unauthorized' },
         { status: 401 }
       )
+    }
+
+    if ((token as any).role && (token as any).role !== 'admin' && (token as any).role !== 'owner' && (token as any).role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     await disconnectPMS(token.hotelId as string, token.id as string)

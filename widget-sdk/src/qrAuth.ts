@@ -236,14 +236,14 @@ export class QRAuthController {
     const permissions = localStorage.getItem('qr_session_permissions')
     const expiresAt = localStorage.getItem('qr_session_expires')
 
-    if (!jwt || !user || !permissions || !expiresAt) {
+    if (!jwt || !user || !expiresAt) {
       return null
     }
 
     return {
       sessionJWT: jwt,
       user: JSON.parse(user),
-      permissions: JSON.parse(permissions),
+      permissions: permissions ? JSON.parse(permissions) : [],
       expiresAt: parseInt(expiresAt, 10),
     }
   }

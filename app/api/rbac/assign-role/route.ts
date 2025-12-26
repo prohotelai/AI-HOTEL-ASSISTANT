@@ -61,12 +61,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Assign role
-    const result = await assignRoleToUser(userId, roleId, assignedBy, hotelId)
+    // Assign role - roleId is the role key
+    const success = await assignRoleToUser(userId, hotelId, roleId, assignedBy)
 
-    if (!result.success) {
+    if (!success) {
       return NextResponse.json(
-        { error: result.error || 'Failed to assign role' },
+        { error: 'Failed to assign role - role may not exist' },
         { status: 400 }
       )
     }

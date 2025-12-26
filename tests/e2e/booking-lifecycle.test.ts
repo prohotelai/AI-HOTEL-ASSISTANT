@@ -329,7 +329,7 @@ describe('E2E: Booking Lifecycle', () => {
           checkInDate,
           checkOutDate,
           confirmationNumber: `CONF-${Date.now()}-cancelled`,
-          status: 'CANCELLED', // Cancelled status
+            status: 'CANCELED', // Cancelled status
           totalAmount: 600,
           currency: 'USD',
           canceledAt: new Date(),

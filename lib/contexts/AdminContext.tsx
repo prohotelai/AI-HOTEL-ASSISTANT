@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react'
  * AdminContext - SaaS Platform Level Context
  * 
  * STRICT ISOLATION:
- * - This context MUST ONLY be used in /admin/** routes
+ * - This context MUST ONLY be used in /admin/** routes (and legacy /dashboard/admin/**)
  * - NEVER import or use PMS contexts
  * - Provides SaaS-level user and hotel information
  * 
@@ -69,12 +69,16 @@ export function useAdminContext() {
     throw new Error('useAdminContext must be used within AdminProvider')
   }
 
-  // GUARD: Ensure we're in an admin route
+  // GUARD: Ensure we're in an admin route; log instead of throwing to avoid client crashes on legacy routes
   if (typeof window !== 'undefined') {
     const pathname = window.location.pathname
-    if (!pathname.startsWith('/admin')) {
-      console.error('❌ CRITICAL: useAdminContext called outside /admin routes:', pathname)
-      throw new Error('useAdminContext can only be used in /admin routes')
+    const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard/admin')
+
+    if (!isAdminRoute) {
+      console.error('❌ CRITICAL: useAdminContext called outside admin routes:', pathname)
+        console.error('useAdminContext can only be used in /admin routes')
+      // Soft failure: return context to avoid crash while still surfacing the misuse
+      return context
     }
   }
 

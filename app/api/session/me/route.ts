@@ -14,9 +14,10 @@ export const runtime = 'nodejs'
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRoles, getUserPermissions } from '@/lib/services/rbac/rbacService'
+import { getUserPermissions } from '@/lib/services/rbac/rbacService'
 import { withAuth, AuthContext } from '@/lib/auth/withAuth'
 import { internalError } from '@/lib/api/errorHandler'
+import { prisma } from '@/lib/prisma'
 
 async function handleGetSession(request: NextRequest, ctx: AuthContext) {
   try {
@@ -24,9 +25,20 @@ async function handleGetSession(request: NextRequest, ctx: AuthContext) {
     const hotelId = ctx.hotelId
     const role = ctx.role
 
-    // Get user roles and permissions
-    // DB operations: wrapped in try/catch
-    const userRoles = await getUserRoles(userId, hotelId)
+    // Get user roles with full details
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        userId,
+        role: {
+          hotelId,
+        },
+      },
+      include: {
+        role: true,
+      },
+    })
+
+    // Get user permissions
     const userPermissions = await getUserPermissions(userId, hotelId)
 
     return NextResponse.json({

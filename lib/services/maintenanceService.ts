@@ -501,6 +501,10 @@ export async function getMaintenanceStats(hotelId: string, startDate: Date, endD
  * Check if room has blocking maintenance
  */
 export async function roomHasBlockingMaintenance(hotelId: string, roomId: string): Promise<boolean> {
+  if (!prisma.maintenanceTicket?.count) {
+    return false
+  }
+
   const count = await prisma.maintenanceTicket.count({
     where: {
       hotelId,

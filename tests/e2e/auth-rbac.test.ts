@@ -35,6 +35,7 @@ describe('E2E: Authentication & RBAC', () => {
   beforeEach(async () => {
     // Clean up test data
     await prisma.rolePermission.deleteMany()
+    await prisma.permission.deleteMany()
     await prisma.userRole.deleteMany()
     await prisma.booking.deleteMany()
     await prisma.ticket.deleteMany()
@@ -86,7 +87,10 @@ describe('E2E: Authentication & RBAC', () => {
       data: {
         key: Permission.ADMIN_MANAGE,
         name: 'Admin Management',
-        description: 'Full admin access'
+        description: 'Full admin access',
+        group: 'admin',
+        resource: 'admin',
+        action: 'manage'
       }
     })
 
@@ -94,7 +98,10 @@ describe('E2E: Authentication & RBAC', () => {
       data: {
         key: Permission.TICKETS_VIEW,
         name: 'View Tickets',
-        description: 'View support tickets'
+        description: 'View support tickets',
+        group: 'tickets',
+        resource: 'tickets',
+        action: 'read'
       }
     })
 
@@ -270,7 +277,10 @@ describe('E2E: Authentication & RBAC', () => {
         data: {
           key: 'special:restricted',
           name: 'Special Restricted',
-          description: 'Special permission'
+          description: 'Special permission',
+          group: 'custom',
+          resource: "special",
+          action: 'read'
         }
       })
 

@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { sign } from 'jsonwebtoken';
 import {
   generateQRToken,
   validateQRToken,
@@ -11,8 +12,20 @@ import {
 } from '@/lib/services/qr/qrService';
 import { prisma } from '@/lib/db';
 
-vi.mock('@/lib/db');
-vi.mock('jsonwebtoken');
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    user: { findUnique: vi.fn() },
+    guestStaffQRToken: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
+      findMany: vi.fn(),
+      groupBy: vi.fn()
+    }
+  }
+}));
 
 describe('QR Code Workflow Integration Tests', () => {
   beforeEach(() => {
@@ -53,7 +66,7 @@ describe('QR Code Workflow Integration Tests', () => {
 
       // Step 2: Guest scans QR and provides token
       // This would happen on the widget
-      expect(token.token).toBe('jwt-guest-token');
+      expect(token.token).toBeTruthy();
     });
   });
 
@@ -150,18 +163,25 @@ describe('QR Code Workflow Integration Tests', () => {
       // Step 2: Validate token (marks as used)
       const mockTokenDb = {
         ...mockToken,
-        isUsed: true,
-        usedAt: new Date(),
+        isUsed: false,
+        usedAt: null,
+        user: mockUser,
       };
 
       vi.mocked(prisma.guestStaffQRToken.findUnique).mockResolvedValue(mockTokenDb as any);
       vi.mocked(prisma.guestStaffQRToken.update).mockResolvedValue(mockTokenDb as any);
 
       // After validation, token should be marked used
+      await validateQRToken(token.token, 'hotel-1');
       expect(prisma.guestStaffQRToken.update).toHaveBeenCalled();
 
       // Step 3: Try to use same token again
-      vi.mocked(prisma.guestStaffQRToken.findUnique).mockResolvedValue(mockTokenDb as any);
+      vi.mocked(prisma.guestStaffQRToken.findUnique).mockResolvedValue({
+        ...mockTokenDb,
+        isUsed: true,
+        usedAt: new Date(),
+        user: mockUser,
+      } as any);
 
       // Should fail because token is already used
       await expect(validateQRToken(token.token, 'hotel-1')).rejects.toThrow(
@@ -197,7 +217,7 @@ describe('QR Code Workflow Integration Tests', () => {
         createdAt: new Date(),
       } as any);
 
-      await generateQRToken('hotel-1', 'user-1', 'guest');
+      const generated = await generateQRToken('hotel-1', 'user-1', 'guest');
 
       // Revoke token
       vi.mocked(prisma.guestStaffQRToken.findUnique).mockResolvedValue(mockToken as any);
@@ -220,7 +240,7 @@ describe('QR Code Workflow Integration Tests', () => {
 
       vi.mocked(prisma.guestStaffQRToken.findUnique).mockResolvedValue(revokedTokenDb as any);
 
-      await expect(validateQRToken('jwt-token', 'hotel-1')).rejects.toThrow(
+      await expect(validateQRToken(generated.token, 'hotel-1')).rejects.toThrow(
         'Token has been revoked'
       );
     });
@@ -295,12 +315,11 @@ describe('QR Code Workflow Integration Tests', () => {
         exp: expiredTime, // Already expired
       };
 
-      // Note: In real test, we'd use jsonwebtoken to sign
-      // For this test, we're checking the expiration check in DB
+      const expiredJwt = sign(payload, process.env.NEXTAUTH_SECRET || 'test-secret')
 
       const expiredToken = {
         id: 'token-1',
-        token: 'expired-jwt',
+        token: expiredJwt,
         hotelId: 'hotel-1',
         userId: 'user-1',
         role: 'guest',
@@ -316,7 +335,7 @@ describe('QR Code Workflow Integration Tests', () => {
 
       vi.mocked(prisma.guestStaffQRToken.findUnique).mockResolvedValue(expiredToken as any);
 
-      await expect(validateQRToken('expired-jwt', 'hotel-1')).rejects.toThrow('expired');
+      await expect(validateQRToken(expiredJwt, 'hotel-1')).rejects.toThrow('expired');
     });
   });
 

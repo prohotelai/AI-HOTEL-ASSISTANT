@@ -427,3 +427,371 @@ export async function getStaffCountByHotel(hotelId: string) {
     {} as Record<string, number>
   )
 }
+
+// =============================
+// Staff Profiles & HR Utilities
+// =============================
+
+function buildProfileInclude() {
+  return {
+    user: {
+      select: {
+        id: true,
+        email: true,
+        name: true
+      }
+    },
+    department: true,
+    hrNotes: {
+      orderBy: { createdAt: 'desc' }
+    },
+    performanceMetrics: {
+      orderBy: { recordedAt: 'desc' }
+    },
+    activities: true,
+    documents: true,
+    calendarEvents: true
+  }
+}
+
+async function logActivity(
+  staffProfileId: string,
+  type: string,
+  title: string,
+  createdBy?: string,
+  description?: string
+) {
+  const client = prisma as any
+  if (!client.staffActivity?.create) return null
+
+  return client.staffActivity.create({
+    data: {
+      staffProfileId,
+      type,
+      title,
+      description,
+      createdBy,
+      createdAt: new Date()
+    }
+  })
+}
+
+export async function createStaffProfile(input: {
+  userId: string
+  hotelId: string
+  firstName: string
+  lastName: string
+  employeeId?: string
+  position?: string
+  employmentStatus?: string
+  startDate?: Date
+  createdBy?: string
+}) {
+  const client = prisma as any
+
+  const profile = await client.staffProfile.create({
+    data: {
+      userId: input.userId,
+      hotelId: input.hotelId,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      employeeId: input.employeeId,
+      position: input.position,
+      employmentStatus: input.employmentStatus || 'ACTIVE',
+      startDate: input.startDate || new Date()
+    },
+    include: buildProfileInclude()
+  })
+
+  await logActivity(profile.id, 'PROFILE_UPDATED', 'Staff profile created', input.createdBy)
+  return profile
+}
+
+export async function getStaffProfile(profileId: string) {
+  const client = prisma as any
+  return client.staffProfile.findUnique({
+    where: { id: profileId },
+    include: buildProfileInclude()
+  })
+}
+
+export async function listStaffProfiles(options: {
+  hotelId: string
+  departmentId?: string
+  employmentStatus?: string
+  limit?: number
+  offset?: number
+  search?: string
+}) {
+  const client = prisma as any
+  const take = options.limit ?? 50
+  const skip = options.offset ?? 0
+
+  const where: any = {
+    hotelId: options.hotelId
+  }
+
+  if (options.departmentId) {
+    where.departmentId = options.departmentId
+  }
+
+  if (options.employmentStatus) {
+    where.employmentStatus = options.employmentStatus
+  }
+
+  if (options.search) {
+    const term = options.search
+    where.OR = [
+      { firstName: { contains: term, mode: 'insensitive' } },
+      { lastName: { contains: term, mode: 'insensitive' } },
+      { email: { contains: term, mode: 'insensitive' } }
+    ]
+  }
+
+  const [profiles, total] = await Promise.all([
+    client.staffProfile.findMany({
+      where,
+      include: buildProfileInclude(),
+      orderBy: { createdAt: 'desc' },
+      take,
+      skip
+    }),
+    client.staffProfile.count({ where })
+  ])
+
+  return { profiles, total, limit: take, offset: skip }
+}
+
+export async function updateStaffProfile(
+  profileId: string,
+  data: Record<string, any>,
+  updatedBy?: string
+) {
+  const client = prisma as any
+
+  const profile = await client.staffProfile.update({
+    where: { id: profileId },
+    data,
+    include: buildProfileInclude()
+  })
+
+  await logActivity(profileId, 'PROFILE_UPDATED', 'Profile updated', updatedBy)
+  return profile
+}
+
+export async function deleteStaffProfile(profileId: string) {
+  const client = prisma as any
+  return client.staffProfile.delete({ where: { id: profileId } })
+}
+
+export async function createDepartment(
+  hotelId: string,
+  name: string,
+  description?: string,
+  color?: string
+) {
+  const client = prisma as any
+  return client.department.create({
+    data: { hotelId, name, description, color }
+  })
+}
+
+export async function listDepartments(hotelId: string) {
+  const client = prisma as any
+  return client.department.findMany({
+    where: { hotelId },
+    include: { _count: { select: { staffProfiles: true } } },
+    orderBy: { name: 'asc' }
+  })
+}
+
+export async function deleteDepartment(departmentId: string) {
+  const client = prisma as any
+  const staffCount = await client.staffProfile.count({ where: { departmentId } })
+  if (staffCount > 0) {
+    throw new Error('Cannot delete department with active staff members')
+  }
+  return client.department.delete({ where: { id: departmentId } })
+}
+
+export async function createHRNote(
+  staffProfileId: string,
+  title: string,
+  content: string,
+  createdBy?: string,
+  isConfidential?: boolean,
+  tags?: string[],
+  attachments?: string[]
+) {
+  const client = prisma as any
+  const note = await client.hRNote.create({
+    data: {
+      staffProfileId,
+      title,
+      content,
+      createdBy,
+      isConfidential: isConfidential ?? false,
+      tags: tags ?? [],
+      attachments: attachments ?? []
+    }
+  })
+
+  await logActivity(staffProfileId, 'NOTE_ADDED', 'HR note added', createdBy)
+  return note
+}
+
+export async function getHRNotes(staffProfileId: string) {
+  const client = prisma as any
+  return client.hRNote.findMany({ where: { staffProfileId } })
+}
+
+export async function logPerformanceMetric(
+  staffProfileId: string,
+  name: string,
+  value: number,
+  periodStart?: Date,
+  periodEnd?: Date,
+  recordedBy?: string,
+  target?: number,
+  unit?: string
+) {
+  const client = prisma as any
+  const metric = await client.performanceMetric.create({
+    data: {
+      staffProfileId,
+      name,
+      value,
+      target,
+      unit,
+      periodStart,
+      periodEnd,
+      recordedBy
+    }
+  })
+
+  await logActivity(staffProfileId, 'METRIC_LOGGED', 'Performance metric logged', recordedBy)
+  return metric
+}
+
+export async function getPerformanceMetrics(
+  staffProfileId: string,
+  startDate: Date,
+  endDate: Date
+) {
+  const client = prisma as any
+  return client.performanceMetric.findMany({
+    where: {
+      staffProfileId,
+      periodStart: { gte: startDate },
+      periodEnd: { lte: endDate }
+    },
+    orderBy: { periodStart: 'desc' }
+  })
+}
+
+export async function uploadStaffDocument(
+  staffProfileId: string,
+  title: string,
+  fileUrl: string,
+  fileName: string,
+  fileSize: number,
+  mimeType: string,
+  uploadedBy?: string,
+  category?: string
+) {
+  const client = prisma as any
+  const document = await client.staffDocument.create({
+    data: {
+      staffProfileId,
+      title,
+      fileUrl,
+      fileName,
+      fileSize,
+      mimeType,
+      uploadedBy,
+      category
+    }
+  })
+
+  await logActivity(staffProfileId, 'DOCUMENT_UPLOADED', 'Document uploaded', uploadedBy)
+  return document
+}
+
+export async function getStaffDocuments(staffProfileId: string) {
+  const client = prisma as any
+  return client.staffDocument.findMany({ where: { staffProfileId } })
+}
+
+export async function createCalendarEvent(
+  staffProfileId: string,
+  title: string,
+  startTime: Date,
+  endTime: Date,
+  createdBy?: string,
+  eventType?: string
+) {
+  const client = prisma as any
+  return client.calendarEvent.create({
+    data: {
+      staffProfileId,
+      title,
+      startTime,
+      endTime,
+      createdBy,
+      eventType
+    }
+  })
+}
+
+export async function getCalendarEvents(
+  staffProfileId: string,
+  startDate: Date,
+  endDate: Date
+) {
+  const client = prisma as any
+  return client.calendarEvent.findMany({
+    where: {
+      staffProfileId,
+      startTime: {
+        gte: startDate,
+        lte: endDate
+      }
+    },
+    orderBy: { startTime: 'asc' }
+  })
+}
+
+export async function createPerformanceReview(
+  staffProfileId: string,
+  reviewerId: string,
+  score: number,
+  notes?: string
+) {
+  const client = prisma as any
+  return client.performanceReview.create({
+    data: { staffProfileId, reviewerId, score, notes }
+  })
+}
+
+export async function getStaffStatistics(hotelId: string) {
+  const client = prisma as any
+  const [totalStaff, activeStaff, departments] = await Promise.all([
+    client.staffProfile.count({ where: { hotelId } }),
+    client.staffProfile.count({ where: { hotelId, employmentStatus: 'ACTIVE' } }),
+    client.department.count({ where: { hotelId } })
+  ])
+
+  const recentActivities = client.staffActivity?.findMany
+    ? await client.staffActivity.findMany({
+        where: { staffProfile: { hotelId } },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      })
+    : []
+
+  const pendingReviews = client.performanceReview?.findMany
+    ? await client.performanceReview.findMany({ where: { staffProfile: { hotelId } } })
+    : []
+
+  return { totalStaff, activeStaff, departments, recentActivities, performanceReviews: pendingReviews }
+}

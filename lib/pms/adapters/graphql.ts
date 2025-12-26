@@ -33,20 +33,30 @@ export class GraphQLAdapter {
   ): Promise<T> {
     const controller = new AbortController()
     const timeout = options.timeout ?? 30000
-    const timeoutId = setTimeout(() => controller.abort(), timeout)
 
     try {
-      const response = await fetch(this.endpoint, {
-        method: 'POST',
-        headers: this.defaultHeaders,
-        body: JSON.stringify({
-          query,
-          variables: options.variables,
+      const response = (await Promise.race([
+        fetch(this.endpoint, {
+          method: 'POST',
+          headers: this.defaultHeaders,
+          body: JSON.stringify({
+            query,
+            variables: options.variables,
+          }),
+          signal: controller.signal,
         }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
+        new Promise<never>((_, reject) =>
+          setTimeout(() => {
+            controller.abort()
+            reject(
+              new PMSIntegrationError('GraphQL request timed out', {
+                statusCode: 504,
+                code: 'TIMEOUT',
+              })
+            )
+          }, timeout)
+        ),
+      ])) as Response
 
       const result: GraphQLResponse<T> = await response.json()
 
@@ -67,8 +77,6 @@ export class GraphQLAdapter {
 
       return result.data
     } catch (error) {
-      clearTimeout(timeoutId)
-
       if (error instanceof PMSIntegrationError) {
         throw error
       }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { QRAuthController, createQRAuth } from '../src/qrAuth'
+import { QRAuthController, createQRAuth } from '../qrAuth'
 
 describe('QRAuthController', () => {
   let qrAuth: QRAuthController

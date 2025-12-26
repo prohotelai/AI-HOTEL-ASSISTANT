@@ -47,6 +47,8 @@ describe('ApaleoAdapter', () => {
       }
     }
     vi.mocked(axios.create).mockReturnValue(mockAxiosInstance as any)
+    // Populate mock.results so tests can access mockAxiosInstance directly
+    axios.create({})
   })
 
   afterEach(() => {

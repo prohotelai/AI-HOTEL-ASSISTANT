@@ -390,6 +390,10 @@ export class ApaleoAdapter extends BasePMSAdapter {
    * Test connection to Apaleo PMS
    */
   async testConnection(config: PMSConnectionConfig): Promise<PMSConnectionTestResult> {
+    if (!config.accessToken) {
+      throw new Error('Apaleo requires an access token')
+    }
+
     try {
       this.initializeClient(config)
 
@@ -456,27 +460,46 @@ export class ApaleoAdapter extends BasePMSAdapter {
    * Sync rooms (units) from Apaleo
    */
   async syncRooms(hotelId: string, config: PMSConnectionConfig): Promise<ExternalRoom[]> {
-    const propertyId = config.metadata?.propertyId || hotelId
+    try {
+      const propertyId = config.metadata?.propertyId || hotelId
 
-    const response = await this.client!.get(`/inventory/v1/units`, {
-      params: { propertyId }
-    })
+      const response = await this.client!.get(`/inventory/v1/units`, {
+        params: { propertyId }
+      })
 
-    const units: ApaleoUnit[] = response.data.units || []
+      const units: ApaleoUnit[] = response.data.units || []
 
-    return units.map((unit: ApaleoUnit) => ({
-      externalId: unit.id,
-      roomNumber: unit.name,
-      roomTypeId: unit.unitGroupId,
-      status: this.mapRoomStatus(unit.status),
-      isActive: unit.status !== 'OutOfService',
-      maxOccupancy: unit.maxPersons,
-      metadata: {
-        apaleoStatus: unit.status,
-        condition: unit.condition,
-        description: unit.description
+      return units.map((unit: ApaleoUnit) => ({
+        externalId: unit.id,
+        roomNumber: unit.name,
+        roomTypeId: unit.unitGroupId,
+        status: this.mapRoomStatus(unit.status),
+        isActive: unit.status !== 'OutOfService',
+        maxOccupancy: unit.maxPersons,
+        metadata: {
+          apaleoStatus: unit.status,
+          condition: unit.condition,
+          description: unit.description
+        }
+      }))
+    } catch (error: any) {
+      const statusCode = error.response?.status?.toString() || error.errorCode || 'UNKNOWN'
+      const pmsError: PMSError = {
+        entityType: 'Connection',
+        operation: 'READ',
+        errorCode: statusCode,
+        errorMessage: error.response?.data?.message || error.message,
+        timestamp: new Date(),
+        retryable: error.response?.status ? error.response.status >= 500 : false
       }
-    }))
+
+      if (error.response?.status === 401) {
+        pmsError.errorCode = 'TOKEN_EXPIRED'
+        pmsError.errorMessage = 'Access token expired, refresh required'
+      }
+
+      throw pmsError
+    }
   }
 
   /**
@@ -638,8 +661,8 @@ export class ApaleoAdapter extends BasePMSAdapter {
   ): Promise<string> {
     const propertyId = config.metadata?.propertyId || hotelId
 
-    const adults = booking.metadata?.adults || Math.floor(booking.numberOfGuests * 0.8) || 1
-    const children = booking.metadata?.children || 0
+    const adults = booking.metadata?.adults ?? booking.numberOfGuests ?? 1
+    const children = booking.metadata?.children ?? 0
     const roomTypeId = booking.metadata?.roomTypeId || booking.roomId
 
     const payload = {
