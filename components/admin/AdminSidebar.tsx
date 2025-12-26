@@ -30,24 +30,25 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { label: 'Overview', href: '/dashboard/admin', icon: <BarChart3 className="w-5 h-5" /> },
-  { label: 'Hotel QR Code', href: '/dashboard/admin/hotel-qr', icon: <QrCode className="w-5 h-5" /> },
-  { label: 'PMS Configuration', href: '/dashboard/admin/pms', icon: <Building2 className="w-5 h-5" /> },
-  { label: 'RBAC & Permissions', href: '/dashboard/admin/rbac', icon: <ShieldCheck className="w-5 h-5" /> },
-  { label: 'Settings', href: '/dashboard/admin/settings', icon: <Settings className="w-5 h-5" /> },
+  { label: 'Overview', href: '/admin/dashboard', icon: <BarChart3 className="w-5 h-5" /> },
+  // Temporarily hidden until pages are migrated to /admin/*
+  // { label: 'Hotel QR Code', href: '/admin/hotel-qr', icon: <QrCode className="w-5 h-5" /> },
+  // { label: 'PMS Configuration', href: '/admin/pms', icon: <Building2 className="w-5 h-5" /> },
+  // { label: 'RBAC & Permissions', href: '/admin/rbac', icon: <ShieldCheck className="w-5 h-5" /> },
+  // { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
 ]
 
 export default function AdminSidebar() {
   const pathname = usePathname()
 
   // GUARD: Ensure this component is only used on /admin routes (client-side only)
-  if (typeof window !== 'undefined' && !pathname?.startsWith('/dashboard/admin')) {
+  if (typeof window !== 'undefined' && !pathname?.startsWith('/admin')) {
     console.error('❌ CRITICAL: AdminSidebar used outside /admin routes:', pathname)
     throw new Error('AdminSidebar can only be used in /admin routes')
   }
 
   const isActive = (href: string) => {
-    if (href === '/dashboard/admin') {
+    if (href === '/admin/dashboard') {
       return pathname === href
     }
     return pathname?.startsWith(href) || false

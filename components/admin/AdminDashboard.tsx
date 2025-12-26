@@ -158,101 +158,14 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
 
         {/* NAVIGATION GRID */}
         <section className="space-y-10">
-          {/* HOTEL SETUP */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-semibold">🏨 Hotel Configuration</h2>
-              <p className="text-sm text-white/60">Manage your hotel setup and core settings</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <NavCard
-                icon={<Building2 className="h-6 w-6" />}
-                title="Hotel Details"
-                description="Configure basic hotel information"
-                href="/dashboard/admin/settings"
-              />
-              <NavCard
-                icon={<Package className="h-6 w-6" />}
-                title="Room Configuration"
-                description="Manage room types and inventory"
-                href="/dashboard/admin/settings"
-              />
-              <NavCard
-                icon={<Zap className="h-6 w-6" />}
-                title="Automation Rules"
-                description="Set up automated operations"
-                href="/dashboard/admin/settings"
-              />
-            </div>
-          </div>
+          {/* HOTEL SETUP - Temporarily Hidden */}
+          {/* Coming Soon: Hotel Configuration section */}
 
-          {/* PMS INTEGRATION */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-semibold">🔗 PMS Integration</h2>
-              <p className="text-sm text-white/60">Connect and sync with your Property Management System</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <NavCard
-                icon={<GitBranch className="h-6 w-6" />}
-                title="PMS Configuration"
-                description="Configure PMS connection settings"
-                href="/dashboard/admin/pms/integration"
-              />
-              <NavCard
-                icon={<Webhook className="h-6 w-6" />}
-                title="PMS Sync Status"
-                description="Monitor real-time synchronization"
-                href="/dashboard/admin/pms"
-              />
-              <NavCard
-                icon={<Clock className="h-6 w-6" />}
-                title="Sync Operations"
-                description="Trigger manual sync and view history"
-                href="/dashboard/admin/pms/connect"
-              />
-            </div>
-          </div>
+          {/* PMS INTEGRATION - Temporarily Hidden */}
+          {/* Coming Soon: PMS Integration section */}
 
-          {/* OPERATIONS */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-semibold">⚙️ Operations & Support</h2>
-              <p className="text-sm text-white/60">Manage staff, QR codes, tickets and system operations</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-4">
-              <NavCard
-                icon={<Wand2 className="h-6 w-6" />}
-                title="AI Setup Wizard"
-                description="Configure AI assistant settings"
-                href="/admin/setup"
-              />
-              <NavCard
-                icon={<QrCode className="h-6 w-6" />}
-                title="QR Code Management"
-                description="Generate and manage QR codes"
-                href="/dashboard/admin/qr"
-              />
-              <NavCard
-                icon={<Users className="h-6 w-6" />}
-                title="Staff Management"
-                description="Manage staff and permissions"
-                href="/dashboard/admin/rbac/roles"
-              />
-              <NavCard
-                icon={<Ticket className="h-6 w-6" />}
-                title="Support Tickets"
-                description="View and manage tickets"
-                href="/dashboard/admin/settings"
-              />
-              <NavCard
-                icon={<Key className="h-6 w-6" />}
-                title="Access Control"
-                description="Manage RBAC and permissions"
-                href="/dashboard/admin/rbac/roles"
-              />
-            </div>
-          </div>
+          {/* OPERATIONS - Temporarily Hidden */}
+          {/* Coming Soon: Operations & Support section */}
 
           {/* DATA TABLES */}
           <section className="grid gap-6 lg:grid-cols-2">

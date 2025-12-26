@@ -24,10 +24,11 @@ interface AdminNavItem {
 
 const adminNavItems: AdminNavItem[] = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: <BarChart3 className="w-4 h-4" /> },
-  { label: 'Hotel QR', href: '/dashboard/admin/hotel-qr', icon: <QrCode className="w-4 h-4" /> },
-  { label: 'PMS Setup', href: '/dashboard/admin/pms', icon: <Building2 className="w-4 h-4" /> },
-  { label: 'RBAC', href: '/dashboard/admin/rbac', icon: <ShieldCheck className="w-4 h-4" /> },
-  { label: 'Settings', href: '/dashboard/admin/settings', icon: <Settings className="w-4 h-4" /> },
+  // Temporarily hidden until pages are migrated to /admin/*
+  // { label: 'Hotel QR', href: '/admin/hotel-qr', icon: <QrCode className="w-4 h-4" /> },
+  // { label: 'PMS Setup', href: '/admin/pms', icon: <Building2 className="w-4 h-4" /> },
+  // { label: 'RBAC', href: '/admin/rbac', icon: <ShieldCheck className="w-4 h-4" /> },
+  // { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-4 h-4" /> },
 ]
 
 export default function AdminHeader() {
@@ -53,7 +54,7 @@ export default function AdminHeader() {
 
   const isActive = (href: string) => {
     if (href === '/admin/dashboard') {
-      return pathname === href || pathname === '/dashboard/admin'
+      return pathname === href
     }
     return pathname?.startsWith(href) || false
   }
@@ -75,7 +76,7 @@ export default function AdminHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* SaaS Platform Logo */}
-          <Link href="/dashboard/admin" className="flex items-center gap-3 group">
+          <Link href="/admin/dashboard" className="flex items-center gap-3 group">
             <div className="bg-blue-600 p-2 rounded-lg group-hover:bg-blue-500 transition">
               <Building2 className="w-6 h-6 text-white" />
             </div>

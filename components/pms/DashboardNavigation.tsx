@@ -21,11 +21,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Admin Dashboard', href: '/dashboard/admin/pms', icon: '📊', roles: ['ADMIN'] },
+  // Removed admin links - admin users should access /admin/dashboard directly
   { label: 'Staff Tasks', href: '/dashboard/staff/tasks', icon: '✅', roles: ['STAFF', 'ADMIN'] },
   { label: 'My Bookings', href: '/dashboard/guest/bookings', icon: '📅', roles: ['GUEST', 'ADMIN'] },
   { label: 'Analytics', href: '/dashboard/analytics', icon: '📈', roles: ['ADMIN'] },
-  { label: 'Settings', href: '/dashboard/admin/settings', icon: '⚙️', roles: ['ADMIN'] }
 ]
 
 // Support navigation item (conditionally shown based on subscription)
