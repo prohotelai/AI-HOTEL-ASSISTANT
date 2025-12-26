@@ -231,7 +231,18 @@ export default function StaffDashboard() {
               <h3 className="font-semibold text-gray-900">My Tasks</h3>
               <p className="text-sm text-gray-600">View and manage assigned tasks</p>
             </a>
-            {/* Admin-only links removed - these routes are being migrated */}
+            <a href="/admin/pms" className="p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors">
+              <h3 className="font-semibold text-gray-900">PMS Integration</h3>
+              <p className="text-sm text-gray-600">Property management system</p>
+            </a>
+            <a href="/admin/tickets" className="p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors">
+              <h3 className="font-semibold text-gray-900">Tickets</h3>
+              <p className="text-sm text-gray-600">Track support tickets</p>
+            </a>
+            <a href="/admin/hotel-qr" className="p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors">
+              <h3 className="font-semibold text-gray-900">QR Management</h3>
+              <p className="text-sm text-gray-600">Generate and manage QR codes</p>
+            </a>
           </div>
         </div>
       </main>

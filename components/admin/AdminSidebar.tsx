@@ -31,11 +31,10 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   { label: 'Overview', href: '/admin/dashboard', icon: <BarChart3 className="w-5 h-5" /> },
-  // Temporarily hidden until pages are migrated to /admin/*
-  // { label: 'Hotel QR Code', href: '/admin/hotel-qr', icon: <QrCode className="w-5 h-5" /> },
-  // { label: 'PMS Configuration', href: '/admin/pms', icon: <Building2 className="w-5 h-5" /> },
-  // { label: 'RBAC & Permissions', href: '/admin/rbac', icon: <ShieldCheck className="w-5 h-5" /> },
-  // { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
+  { label: 'Hotel QR Code', href: '/admin/hotel-qr', icon: <QrCode className="w-5 h-5" /> },
+  { label: 'PMS Configuration', href: '/admin/pms', icon: <Building2 className="w-5 h-5" /> },
+  { label: 'RBAC & Permissions', href: '/admin/rbac', icon: <ShieldCheck className="w-5 h-5" /> },
+  { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-5 h-5" /> },
 ]
 
 export default function AdminSidebar() {

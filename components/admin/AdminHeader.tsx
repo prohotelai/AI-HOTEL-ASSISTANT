@@ -24,11 +24,10 @@ interface AdminNavItem {
 
 const adminNavItems: AdminNavItem[] = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: <BarChart3 className="w-4 h-4" /> },
-  // Temporarily hidden until pages are migrated to /admin/*
-  // { label: 'Hotel QR', href: '/admin/hotel-qr', icon: <QrCode className="w-4 h-4" /> },
-  // { label: 'PMS Setup', href: '/admin/pms', icon: <Building2 className="w-4 h-4" /> },
-  // { label: 'RBAC', href: '/admin/rbac', icon: <ShieldCheck className="w-4 h-4" /> },
-  // { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-4 h-4" /> },
+  { label: 'Hotel QR', href: '/admin/hotel-qr', icon: <QrCode className="w-4 h-4" /> },
+  { label: 'PMS Setup', href: '/admin/pms', icon: <Building2 className="w-4 h-4" /> },
+  { label: 'RBAC', href: '/admin/rbac', icon: <ShieldCheck className="w-4 h-4" /> },
+  { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-4 h-4" /> },
 ]
 
 export default function AdminHeader() {
