@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json()
     } catch (parseError) {
+      console.error('JSON parse error:', parseError)
       return badRequest(
         'Invalid JSON in request body',
         { endpoint: '/api/register', method: 'POST' }
@@ -43,6 +44,13 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, email, password, hotelName } = body
+
+    console.log('Registration attempt with:', {
+      hasName: !!name,
+      hasEmail: !!email,
+      hasPassword: !!password,
+      hasHotelName: !!hotelName,
+    })
 
     // Validate required fields
     if (!email || !password || !hotelName) {

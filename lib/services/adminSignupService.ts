@@ -88,6 +88,8 @@ export async function createHotelAdminSignup(
 
   const emailLower = input.email.toLowerCase()
 
+  console.log('Creating hotel admin signup for:', { email: emailLower, hotelName: input.hotelName })
+
   // Check if email already exists
   const existingUser = await prisma.user.findUnique({
     where: { email: emailLower },
@@ -121,13 +123,18 @@ export async function createHotelAdminSignup(
     })
   }
 
+  console.log('Generated hotelId:', hotelId)
+
   // Generate permanent QR code OUTSIDE transaction
   // (Prisma transactions should not contain non-Prisma async operations)
+  console.log('Generating QR code...')
   const { qrCode, qrPayload } = await generatePermanentHotelQR(hotelId)
+  console.log('QR code generated')
 
   // Create user and hotel in atomic transaction
   // If hotel creation fails, user creation rolls back
   const result = await prisma.$transaction(async (tx) => {
+    console.log('Creating hotel...')
     // 1. Create Hotel with permanent QR
     const hotel = await tx.hotel.create({
       data: {
@@ -143,7 +150,10 @@ export async function createHotelAdminSignup(
       }
     })
 
+    console.log('Hotel created:', hotel.id)
+
     // 2. Create User linked to Hotel
+    console.log('Creating user...')
     const user = await tx.user.create({
       data: {
         name: input.name?.trim() || null,
@@ -153,6 +163,8 @@ export async function createHotelAdminSignup(
         hotelId: hotel.id,
       }
     })
+
+    console.log('User created:', user.id)
 
     return { user, hotel }
   })
