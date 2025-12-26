@@ -42,8 +42,13 @@ export default function AdminHeader() {
     throw new Error('AdminHeader can only be used in /admin routes')
   }
 
+  // Log dashboard activation ONCE on mount (not on every render)
   if (typeof window !== 'undefined') {
-    console.log('✅ ACTIVE DASHBOARD: ADMIN')
+    const logKey = 'admin-header-logged'
+    if (!sessionStorage.getItem(logKey)) {
+      console.log('✅ ACTIVE DASHBOARD: ADMIN')
+      sessionStorage.setItem(logKey, 'true')
+    }
   }
 
   const isActive = (href: string) => {

@@ -46,8 +46,13 @@ export default function DashboardNavigation() {
     throw new Error('PMS DashboardNavigation cannot be used in /admin routes. Use AdminHeader instead.')
   }
 
+  // Log dashboard activation ONCE on mount (not on every render)
   if (typeof window !== 'undefined') {
-    console.log('✅ ACTIVE DASHBOARD: PMS')
+    const logKey = 'pms-dashboard-logged'
+    if (!sessionStorage.getItem(logKey)) {
+      console.log('✅ ACTIVE DASHBOARD: PMS')
+      sessionStorage.setItem(logKey, 'true')
+    }
   }
 
   const userRole = (session?.user?.role as string)?.toUpperCase() || 'GUEST'

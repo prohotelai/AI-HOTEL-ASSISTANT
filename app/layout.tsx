@@ -15,6 +15,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'AI Hotel Assistant',
   description: 'Multi-tenant AI-powered hotel assistant platform',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
