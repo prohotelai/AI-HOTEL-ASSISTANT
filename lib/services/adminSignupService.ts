@@ -121,12 +121,13 @@ export async function createHotelAdminSignup(
     })
   }
 
+  // Generate permanent QR code OUTSIDE transaction
+  // (Prisma transactions should not contain non-Prisma async operations)
+  const { qrCode, qrPayload } = await generatePermanentHotelQR(hotelId)
+
   // Create user and hotel in atomic transaction
   // If hotel creation fails, user creation rolls back
   const result = await prisma.$transaction(async (tx) => {
-    // Generate permanent QR code for hotel (ONCE)
-    const { qrCode, qrPayload } = await generatePermanentHotelQR(hotelId)
-
     // 1. Create Hotel with permanent QR
     const hotel = await tx.hotel.create({
       data: {
