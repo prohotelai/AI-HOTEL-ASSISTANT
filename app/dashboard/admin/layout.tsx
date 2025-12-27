@@ -24,6 +24,7 @@ import { AdminProvider } from '@/lib/contexts/AdminContext'
  */
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+  console.log('DashboardAdminLayout: Rendering AdminHeader and AdminSidebar')
   return (
     <AdminProvider>
       <div className="min-h-screen bg-slate-950">

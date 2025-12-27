@@ -18,6 +18,7 @@ import { PMSProvider } from '@/lib/contexts/PMSContext'
  */
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  console.log('DashboardLayout: Rendering DashboardNavigation')
   return (
     <PMSProvider>
       <div className="min-h-screen bg-gray-50">

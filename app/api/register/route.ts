@@ -33,8 +33,25 @@ export async function POST(req: NextRequest) {
   try {
     // Parse request body
     let body: any = {}
+    
+    // Check if request has content
+    const contentType = req.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      return badRequest(
+        'Content-Type must be application/json',
+        { endpoint: '/api/register', method: 'POST' }
+      )
+    }
+
     try {
-      body = await req.json()
+      const text = await req.text()
+      if (!text || text.trim().length === 0) {
+        return badRequest(
+          'Request body cannot be empty',
+          { endpoint: '/api/register', method: 'POST' }
+        )
+      }
+      body = JSON.parse(text)
     } catch (parseError) {
       console.error('JSON parse error:', parseError)
       return badRequest(
